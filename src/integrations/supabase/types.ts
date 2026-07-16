@@ -14,7 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      threats: {
+        Row: {
+          created_at: string
+          description: string | null
+          details: Json
+          id: string
+          severity: Database["public"]["Enums"]["threat_severity"]
+          source: string | null
+          status: Database["public"]["Enums"]["threat_status"]
+          threat_type: Database["public"]["Enums"]["threat_type"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          details?: Json
+          id?: string
+          severity?: Database["public"]["Enums"]["threat_severity"]
+          source?: string | null
+          status?: Database["public"]["Enums"]["threat_status"]
+          threat_type?: Database["public"]["Enums"]["threat_type"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          details?: Json
+          id?: string
+          severity?: Database["public"]["Enums"]["threat_severity"]
+          source?: string | null
+          status?: Database["public"]["Enums"]["threat_status"]
+          threat_type?: Database["public"]["Enums"]["threat_type"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +64,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      threat_severity: "low" | "medium" | "high" | "critical"
+      threat_status: "active" | "dismissed" | "blocked"
+      threat_type: "phishing" | "scam" | "hack" | "suspicious_link" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +193,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      threat_severity: ["low", "medium", "high", "critical"],
+      threat_status: ["active", "dismissed", "blocked"],
+      threat_type: ["phishing", "scam", "hack", "suspicious_link", "other"],
+    },
   },
 } as const
