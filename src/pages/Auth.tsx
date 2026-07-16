@@ -37,8 +37,11 @@ const Auth = () => {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Account created", { description: "You're signed in." });
-        navigate("/", { replace: true });
+        // Require explicit log in after account creation
+        await supabase.auth.signOut();
+        toast.success("Account created", { description: "Please log in to continue." });
+        setMode("signin");
+        setPassword("");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -46,7 +49,7 @@ const Auth = () => {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      toast.error(mode === "signup" ? "Sign-up failed" : "Sign-in failed", { description: msg });
+      toast.error(mode === "signup" ? "Sign-up failed" : "Log-in failed", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -83,7 +86,7 @@ const Auth = () => {
                 mode === "signin" ? "bg-background text-foreground" : "text-muted-foreground"
               }`}
             >
-              Sign in
+              Log in
             </button>
             <button
               onClick={() => setMode("signup")}
@@ -143,7 +146,7 @@ const Auth = () => {
               />
             </div>
             <Button type="submit" disabled={busy} className="w-full bg-gradient-shield hover:opacity-90 glow-shield">
-              {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+              {busy ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}
             </Button>
           </form>
         </div>
