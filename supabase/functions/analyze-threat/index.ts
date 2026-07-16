@@ -85,7 +85,18 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      return json({ error: 'Could not parse analysis' }, 502);
+      // Try to extract JSON from markdown code fences or surrounding text
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (!match) {
+        console.error('Could not parse analysis, raw:', rawText);
+        return json({ error: 'Could not parse analysis' }, 502);
+      }
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch (e) {
+        console.error('Could not parse extracted JSON:', match[0], e);
+        return json({ error: 'Could not parse analysis' }, 502);
+      }
     }
 
     // Only insert into DB if it's actually a threat
