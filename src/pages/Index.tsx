@@ -21,9 +21,21 @@ import {
   Loader2,
   Trash2,
   Ban,
+  Camera,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,8 +59,6 @@ type Threat = {
 
 const navItems = [
   { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Threats", icon: AlertTriangle },
-  { label: "Scanner", icon: ScanLine },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
@@ -72,6 +82,13 @@ const Index = () => {
   const [threats, setThreats] = useState<Threat[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanText, setScanText] = useState("");
+  const [displayName, setDisplayName] = useState<string>("");
+  const [avatarPath, setAvatarPath] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth", { replace: true });
@@ -98,6 +115,93 @@ const Index = () => {
   useEffect(() => {
     if (user) loadThreats();
   }, [user, loadThreats]);
+
+  const loadProfile = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("display_name, avatar_path")
+      .eq("id", user.id)
+      .maybeSingle();
+    const name = data?.display_name ?? user.email?.split("@")[0] ?? "";
+    setDisplayName(name);
+    setNameDraft(name);
+    setAvatarPath(data?.avatar_path ?? null);
+    if (data?.avatar_path) {
+      const { data: signed } = await supabase.storage
+        .from("avatars")
+        .createSignedUrl(data.avatar_path, 3600);
+      setAvatarUrl(signed?.signedUrl ?? null);
+    } else {
+      setAvatarUrl(null);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) loadProfile();
+  }, [user, loadProfile]);
+
+  const saveName = async () => {
+    if (!user) return;
+    const name = nameDraft.trim();
+    if (!name) {
+      toast.error("Name cannot be empty");
+      return;
+    }
+    setSavingProfile(true);
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, display_name: name });
+    setSavingProfile(false);
+    if (error) {
+      toast.error("Couldn't save", { description: error.message });
+      return;
+    }
+    setDisplayName(name);
+    toast.success("Name updated");
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!user) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5MB");
+      return;
+    }
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${user.id}/avatar-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("avatars")
+      .upload(path, file, { upsert: true });
+    if (upErr) {
+      setUploadingAvatar(false);
+      toast.error("Upload failed", { description: upErr.message });
+      return;
+    }
+    // remove old
+    if (avatarPath) {
+      await supabase.storage.from("avatars").remove([avatarPath]);
+    }
+    const { error: profErr } = await supabase
+      .from("profiles")
+      .upsert({ id: user.id, avatar_path: path });
+    if (profErr) {
+      setUploadingAvatar(false);
+      toast.error("Couldn't save avatar", { description: profErr.message });
+      return;
+    }
+    setAvatarPath(path);
+    const { data: signed } = await supabase.storage
+      .from("avatars")
+      .createSignedUrl(path, 3600);
+    setAvatarUrl(signed?.signedUrl ?? null);
+    setUploadingAvatar(false);
+    toast.success("Profile picture updated");
+  };
 
   const activeThreats = useMemo(() => (threats ?? []).filter((t) => t.status === "active"), [threats]);
   const dismissedCount = useMemo(() => (threats ?? []).filter((t) => t.status !== "active").length, [threats]);
@@ -167,8 +271,8 @@ const Index = () => {
     );
   }
 
-  const displayName = user.email?.split("@")[0] ?? "there";
   const hasActive = activeThreats.length > 0;
+  const initial = (displayName || user.email || "?").charAt(0).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -197,21 +301,29 @@ const Index = () => {
             >
               <item.icon className="w-4 h-4" />
               <span className="flex-1 text-left">{item.label}</span>
-              {item.label === "Threats" && activeThreats.length > 0 && (
-                <span className="bg-destructive text-destructive-foreground text-[10px] font-semibold rounded-full w-5 h-5 flex items-center justify-center">
-                  {activeThreats.length}
-                </span>
-              )}
             </button>
           ))}
         </nav>
 
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center">
-            <User className="w-4 h-4" />
-          </div>
+          <button
+            onClick={() => setProfileOpen(true)}
+            className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center overflow-hidden shrink-0 hover:ring-2 hover:ring-primary/50 transition"
+            aria-label="Edit profile"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-semibold">{initial}</span>
+            )}
+          </button>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold truncate">{user.email}</p>
+            <button
+              onClick={() => setProfileOpen(true)}
+              className="text-xs font-semibold truncate hover:underline block max-w-full text-left"
+            >
+              {displayName || user.email}
+            </button>
             <button onClick={signOut} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
               <LogOut className="w-3 h-3" /> Sign out
             </button>
@@ -224,7 +336,7 @@ const Index = () => {
         {/* Top bar */}
         <header className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Hello, {displayName} 👋</h2>
+            <h2 className="text-2xl font-bold">Hello, {displayName || "there"} 👋</h2>
             <p className="text-sm text-muted-foreground">
               {hasActive
                 ? `${activeThreats.length} active threat${activeThreats.length === 1 ? "" : "s"} needs your attention`
@@ -324,6 +436,66 @@ const Index = () => {
           Trust Shield analyzes content you submit. It cannot access your device, messages, or accounts on its own.
         </footer>
       </main>
+
+      {/* Profile dialog */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Your profile</DialogTitle>
+            <DialogDescription>Change your display name and profile picture.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-secondary overflow-hidden flex items-center justify-center border border-border">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-semibold">{initial}</span>
+                )}
+              </div>
+              <div>
+                <label className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-md bg-secondary hover:bg-secondary/80 cursor-pointer border border-border">
+                  {uploadingAvatar ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+                  {uploadingAvatar ? "Uploading…" : "Upload picture"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingAvatar}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadAvatar(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <p className="text-[11px] text-muted-foreground mt-1">PNG or JPG, up to 5MB</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Display name</Label>
+              <Input
+                id="displayName"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={50}
+                placeholder="Your name"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>Close</Button>
+            <Button onClick={saveName} disabled={savingProfile || nameDraft.trim() === displayName}>
+              {savingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Save name
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
