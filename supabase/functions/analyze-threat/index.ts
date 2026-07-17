@@ -10,19 +10,57 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUP
 
 const AnalysisSchema = z.object({
   is_threat: z.boolean(),
-  threat_type: z.enum(['phishing', 'scam', 'hack', 'suspicious_link', 'other']),
-  severity: z.enum(['low', 'medium', 'high', 'critical']),
-  title: z.string().min(1).max(90),
-  summary: z.string().min(1).max(1200),
-  indicators: z.array(z.string()).default([]),
-  suspicious_urls: z.array(z.string()).default([]),
-  recommended_action: z.string().min(1).max(700),
-  risk_score: z.number().int().min(0).max(100),
-  risk_level: z.enum(['safe', 'low', 'elevated', 'high']),
-  risk_warnings: z.array(z.string()).default([]),
+  threat_type: z.string(),
+  severity: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  indicators: z.array(z.string()).optional(),
+  suspicious_urls: z.array(z.string()).optional(),
+  recommended_action: z.string(),
+  risk_score: z.number().min(0).max(100),
+  risk_level: z.string(),
+  risk_warnings: z.array(z.string()).optional(),
 });
 
-type Analysis = z.infer<typeof AnalysisSchema>;
+type Analysis = {
+  is_threat: boolean;
+  threat_type: 'phishing' | 'scam' | 'hack' | 'suspicious_link' | 'other';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  summary: string;
+  indicators: string[];
+  suspicious_urls: string[];
+  recommended_action: string;
+  risk_score: number;
+  risk_level: 'safe' | 'low' | 'elevated' | 'high';
+  risk_warnings: string[];
+};
+
+const THREAT_TYPES = ['phishing', 'scam', 'hack', 'suspicious_link', 'other'] as const;
+const SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+const RISK_LEVELS = ['safe', 'low', 'elevated', 'high'] as const;
+
+function pickEnum<T extends readonly string[]>(value: unknown, allowed: T, fallback: T[number]): T[number] {
+  const v = String(value ?? '').toLowerCase().trim();
+  return (allowed as readonly string[]).includes(v) ? (v as T[number]) : fallback;
+}
+
+function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
+  const score = Math.max(0, Math.min(100, Math.round(Number(raw.risk_score) || 0)));
+  return {
+    is_threat: !!raw.is_threat,
+    threat_type: pickEnum(raw.threat_type, THREAT_TYPES, 'other'),
+    severity: pickEnum(raw.severity, SEVERITIES, 'medium'),
+    title: (raw.title || 'Scan result').slice(0, 90),
+    summary: (raw.summary || '').slice(0, 1200),
+    indicators: (raw.indicators ?? []).map((s) => String(s)),
+    suspicious_urls: (raw.suspicious_urls ?? []).map((s) => String(s)),
+    recommended_action: (raw.recommended_action || '').slice(0, 700),
+    risk_score: score,
+    risk_level: pickEnum(raw.risk_level, RISK_LEVELS, score >= 70 ? 'high' : score >= 40 ? 'elevated' : score > 0 ? 'low' : 'safe'),
+    risk_warnings: (raw.risk_warnings ?? []).map((s) => String(s)),
+  };
+}
 
 const SYSTEM_PROMPT =
   'You are Trust Shield, a security analyst. Analyze user-provided text, email bodies, SMS messages, chat messages, domains, or URLs for scams, phishing, hacking indicators, malware, credential theft, and data-corruption risk. Also evaluate residual risk even for legitimate sites, including tracking, data harvesting, redirects, look-alike domains, file tampering, and weak trust signals. Use cautious, evidence-based language. Every summary must end with a complete sentence.';
@@ -65,23 +103,37 @@ Deno.serve(async (req) => {
 
     const gateway = createGateway(LOVABLE_API_KEY);
     let parsed: Analysis;
-    try {
+    const promptText =
+      `Analyze this content for security threats. Keep the summary to 2-4 complete sentences. ` +
+      `Return evidence-based results only; do not invent identities or attackers.\n\n` +
+      `Content to analyze:\n"""\n${content}\n"""`;
+
+    const runModel = async (modelId: string) => {
       const { object } = await generateObject({
-        model: gateway('google/gemini-2.5-flash'),
+        model: gateway(modelId),
         schema: AnalysisSchema,
         system: SYSTEM_PROMPT,
-        prompt:
-          `Analyze this content for security threats. Keep the summary to 2-4 complete sentences. ` +
-          `Return evidence-based results only; do not invent identities or attackers.\n\n` +
-          `Content to analyze:\n"""\n${content}\n"""`,
+        prompt: promptText,
       });
-      parsed = object;
+      return normalize(object);
+    };
+
+    try {
+      parsed = await runModel('google/gemini-2.5-flash');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('AI structured analysis failed', message);
+      console.error('AI structured analysis failed (primary)', message);
       if (message.includes('429')) return json({ error: 'Rate limit reached — try again in a moment.' }, 429);
       if (message.includes('402')) return json({ error: 'AI credits exhausted. Add credits in workspace settings.' }, 402);
-      parsed = createBasicAnalysis(content);
+      try {
+        parsed = await runModel('google/gemini-2.5-flash-lite');
+      } catch (err2) {
+        const m2 = err2 instanceof Error ? err2.message : String(err2);
+        console.error('AI structured analysis failed (retry)', m2);
+        if (m2.includes('429')) return json({ error: 'Rate limit reached — try again in a moment.' }, 429);
+        if (m2.includes('402')) return json({ error: 'AI credits exhausted. Add credits in workspace settings.' }, 402);
+        parsed = createBasicAnalysis(content);
+      }
     }
 
     // Only insert into DB if it's actually a threat
