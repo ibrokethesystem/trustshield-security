@@ -779,6 +779,9 @@ const Index = () => {
 };
 
 function SecurityScoreCard({ score }: { score: number }) {
+  return _SecurityScoreCard({ score });
+}
+function _SecurityScoreCard({ score }: { score: number }) {
   const tone =
     score >= 80
       ? { ring: "text-green-400", bg: "bg-green-400/10", label: "Healthy" }
