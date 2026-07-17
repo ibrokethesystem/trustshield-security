@@ -300,6 +300,10 @@ const Index = () => {
 
   const hasActive = activeThreats.length > 0;
   const initial = (displayName || user.email || "?").charAt(0).toUpperCase();
+  const signInIso = user.last_sign_in_at ?? user.created_at;
+  const daysSinceSignIn = signInIso
+    ? Math.max(0, Math.floor((Date.now() - new Date(signInIso).getTime()) / 86400000))
+    : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
