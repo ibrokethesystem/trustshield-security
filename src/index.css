@@ -135,4 +135,36 @@ All colors MUST be HSL.
     100% { transform: translateX(100%); }
   }
   .animate-scan-sweep { animation: scan-sweep 2.5s linear infinite; }
+
+  .trust-bottom-toast[data-sonner-toast] {
+    width: min(calc(100vw - 288px), 1100px) !important;
+    padding: 20px 28px 20px 20px !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .trust-bottom-toast[data-sonner-toast] [data-icon] {
+    margin-left: 0 !important;
+    margin-right: 8px !important;
+    margin-top: 3px;
+  }
+
+  .trust-bottom-toast[data-sonner-toast] [data-content] {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .trust-bottom-toast[data-sonner-toast] [data-title],
+  .trust-bottom-toast[data-sonner-toast] [data-description] {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 768px) {
+    .trust-bottom-toast[data-sonner-toast] {
+      width: calc(100vw - 24px) !important;
+      padding: 18px 20px 18px 18px !important;
+    }
+  }
 }
