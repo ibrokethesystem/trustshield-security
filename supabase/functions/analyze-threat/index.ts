@@ -1,7 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
-import { generateObject } from 'npm:ai';
+import { generateObject, NoObjectGeneratedError } from 'npm:ai';
 import { z } from 'npm:zod';
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -14,12 +14,12 @@ const AnalysisSchema = z.object({
   severity: z.string(),
   title: z.string(),
   summary: z.string(),
-  indicators: z.array(z.string()).optional(),
-  suspicious_urls: z.array(z.string()).optional(),
+  indicators: z.array(z.string()),
+  suspicious_urls: z.array(z.string()),
   recommended_action: z.string(),
-  risk_score: z.number().min(0).max(100),
+  risk_score: z.number(),
   risk_level: z.string(),
-  risk_warnings: z.array(z.string()).optional(),
+  risk_warnings: z.array(z.string()),
 });
 
 type Analysis = {
@@ -109,13 +109,22 @@ Deno.serve(async (req) => {
       `Content to analyze:\n"""\n${content}\n"""`;
 
     const runModel = async (modelId: string) => {
-      const { object } = await generateObject({
-        model: gateway(modelId),
-        schema: AnalysisSchema,
-        system: SYSTEM_PROMPT,
-        prompt: promptText,
-      });
-      return normalize(object);
+      try {
+        const { object } = await generateObject({
+          model: gateway(modelId),
+          schema: AnalysisSchema,
+          system: SYSTEM_PROMPT,
+          prompt: promptText,
+        });
+        return normalize(object as z.infer<typeof AnalysisSchema>);
+      } catch (error) {
+        if (NoObjectGeneratedError.isInstance(error)) {
+          const raw = (error as { text?: string }).text ?? '';
+          const salvaged = salvageJson(raw);
+          if (salvaged) return normalize(salvaged);
+        }
+        throw error;
+      }
     };
 
     try {
