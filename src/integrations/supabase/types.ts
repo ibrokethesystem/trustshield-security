@@ -38,6 +38,53 @@ export type Database = {
         }
         Relationships: []
       }
+      scan_history: {
+        Row: {
+          created_at: string
+          had_image: boolean
+          id: string
+          risk_level: string | null
+          risk_score: number
+          snippet: string | null
+          summary: string | null
+          threat_id: string | null
+          user_id: string
+          verdict: string
+        }
+        Insert: {
+          created_at?: string
+          had_image?: boolean
+          id?: string
+          risk_level?: string | null
+          risk_score?: number
+          snippet?: string | null
+          summary?: string | null
+          threat_id?: string | null
+          user_id: string
+          verdict: string
+        }
+        Update: {
+          created_at?: string
+          had_image?: boolean
+          id?: string
+          risk_level?: string | null
+          risk_score?: number
+          snippet?: string | null
+          summary?: string | null
+          threat_id?: string | null
+          user_id?: string
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_history_threat_id_fkey"
+            columns: ["threat_id"]
+            isOneToOne: false
+            referencedRelation: "threats"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       threats: {
         Row: {
           created_at: string
