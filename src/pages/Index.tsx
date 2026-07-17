@@ -806,6 +806,91 @@ function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
 }
 
+function ScanHistoryView({
+  history,
+  onRefresh,
+  onClear,
+}: {
+  history: ScanRecord[] | null;
+  onRefresh: () => void;
+  onClear: () => void;
+}) {
+  const verdictStyles: Record<string, string> = {
+    threat: "bg-destructive/10 text-destructive border-destructive/30",
+    caution: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+    safe: "bg-green-500/10 text-green-400 border-green-500/30",
+  };
+  const verdictLabel: Record<string, string> = {
+    threat: "Threat",
+    caution: "Caution",
+    safe: "Safe",
+  };
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <History className="w-5 h-5 text-primary" /> Scan history
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Everything you've scanned, safe or otherwise. Newest first.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={onRefresh} className="h-8 text-xs">Refresh</Button>
+          {history && history.length > 0 && (
+            <Button size="sm" variant="outline" onClick={onClear} className="h-8 text-xs text-destructive hover:text-destructive">
+              Clear all
+            </Button>
+          )}
+        </div>
+      </div>
+      {history === null ? (
+        <div className="bg-card border border-border rounded-2xl p-10 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : history.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center mb-3">
+            <History className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <h4 className="font-semibold">No scans yet</h4>
+          <p className="text-sm text-muted-foreground max-w-sm mt-1">
+            Run a scan from the dashboard and it'll show up here with its verdict and risk score.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {history.map((h) => (
+            <li key={h.id} className="bg-card border border-border rounded-xl p-3 flex items-start gap-3">
+              <div className={cn("text-[10px] font-semibold px-2 py-1 rounded border uppercase tracking-wider shrink-0", verdictStyles[h.verdict] ?? verdictStyles.safe)}>
+                {verdictLabel[h.verdict] ?? h.verdict}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium truncate">{h.summary || "Scan"}</p>
+                  <span className="text-[10px] text-muted-foreground">Risk {h.risk_score}/100</span>
+                  {h.had_image && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground flex items-center gap-1">
+                      <Camera className="w-3 h-3" /> screenshot
+                    </span>
+                  )}
+                </div>
+                {h.snippet && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap break-words">{h.snippet}</p>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {new Date(h.created_at).toLocaleString()}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function StatCard({
   icon: Icon,
   iconClass,
