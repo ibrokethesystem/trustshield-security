@@ -29,6 +29,7 @@ import {
   Sparkles,
   Send,
   Gauge,
+  History,
 } from "lucide-react";
 import {
   LineChart,
@@ -71,8 +72,22 @@ type Threat = {
   created_at: string;
 };
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
+type ScanRecord = {
+  id: string;
+  verdict: string;
+  risk_score: number;
+  risk_level: string | null;
+  summary: string | null;
+  snippet: string | null;
+  had_image: boolean;
+  threat_id: string | null;
+  created_at: string;
+};
+
+type ViewKey = "dashboard" | "history";
+const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "history", label: "Scan history", icon: History },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
@@ -106,6 +121,8 @@ const Index = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
+  const [view, setView] = useState<ViewKey>("dashboard");
+  const [history, setHistory] = useState<ScanRecord[] | null>(null);
 
   const submissionsKey = user ? `ts_submissions_${user.id}` : "";
   useEffect(() => {
@@ -139,6 +156,24 @@ const Index = () => {
   useEffect(() => {
     if (user) loadThreats();
   }, [user, loadThreats]);
+
+  const loadHistory = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("scan_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      toast.error("Couldn't load scan history", { description: error.message });
+      return;
+    }
+    setHistory((data ?? []) as ScanRecord[]);
+  }, [user]);
+
+  useEffect(() => {
+    if (user && view === "history") loadHistory();
+  }, [user, view, loadHistory]);
 
   const loadProfile = useCallback(async () => {
     if (!user) return;
@@ -286,15 +321,48 @@ const Index = () => {
         setSubmissions(next);
         localStorage.setItem(submissionsKey, String(next));
       }
+      const level = analysis.risk_level as string | undefined;
+      const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
+      const verdict = analysis.is_threat
+        ? "threat"
+        : level === "elevated" || level === "high" || score >= 40
+        ? "caution"
+        : "safe";
+      const snippet = content ? content.slice(0, 240) : null;
+      const { data: histRow } = await supabase
+        .from("scan_history")
+        .insert({
+          user_id: user!.id,
+          verdict,
+          risk_score: score,
+          risk_level: level ?? null,
+          summary: analysis.title || analysis.summary || null,
+          snippet,
+          had_image: !!scanImage,
+          threat_id: null,
+        })
+        .select("id")
+        .maybeSingle();
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
         setScanImage(null);
         await loadThreats();
+        if (histRow?.id) {
+          // best-effort link to the newest threat
+          const { data: latest } = await supabase
+            .from("threats")
+            .select("id")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (latest?.id) {
+            await supabase.from("scan_history").update({ threat_id: latest.id }).eq("id", histRow.id);
+          }
+        }
+        if (view === "history") loadHistory();
       } else {
-        const level = analysis.risk_level as string | undefined;
         const warnings: string[] = analysis.risk_warnings ?? [];
-        const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
         if ((level === "elevated" || level === "high" || score >= 40) && warnings.length > 0) {
           toast.warning("Legitimate — but proceed with caution", {
             description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
@@ -311,6 +379,7 @@ const Index = () => {
           });
         }
         setScanImage(null);
+        if (view === "history") loadHistory();
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
@@ -402,9 +471,10 @@ const Index = () => {
           {navItems.map((item) => (
             <button
               key={item.label}
+              onClick={() => setView(item.key)}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                item.active
+                view === item.key
                   ? "bg-secondary text-foreground"
                   : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               )}
@@ -464,6 +534,8 @@ const Index = () => {
           </div>
         </header>
 
+        {view === "dashboard" ? (
+          <>
         {/* Stat cards */}
         <div className="grid grid-cols-4 gap-4">
           <SecurityScoreCard score={securityScore} />
@@ -611,6 +683,23 @@ const Index = () => {
             </ul>
           )}
         </section>
+          </>
+        ) : (
+          <ScanHistoryView
+            history={history}
+            onRefresh={loadHistory}
+            onClear={async () => {
+              if (!user) return;
+              const { error } = await supabase.from("scan_history").delete().eq("user_id", user.id);
+              if (error) {
+                toast.error("Couldn't clear history", { description: error.message });
+                return;
+              }
+              setHistory([]);
+              toast.success("Scan history cleared");
+            }}
+          />
+        )}
 
         <footer className="text-xs text-muted-foreground pb-6">
           Trust Shield analyzes content you submit. It cannot access your device, messages, or accounts on its own.
@@ -690,6 +779,7 @@ const Index = () => {
 };
 
 function SecurityScoreCard({ score }: { score: number }) {
+  // score summary card
   const tone =
     score >= 80
       ? { ring: "text-green-400", bg: "bg-green-400/10", label: "Healthy" }
@@ -714,6 +804,91 @@ function SecurityScoreCard({ score }: { score: number }) {
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
+}
+
+function ScanHistoryView({
+  history,
+  onRefresh,
+  onClear,
+}: {
+  history: ScanRecord[] | null;
+  onRefresh: () => void;
+  onClear: () => void;
+}) {
+  const verdictStyles: Record<string, string> = {
+    threat: "bg-destructive/10 text-destructive border-destructive/30",
+    caution: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+    safe: "bg-green-500/10 text-green-400 border-green-500/30",
+  };
+  const verdictLabel: Record<string, string> = {
+    threat: "Threat",
+    caution: "Caution",
+    safe: "Safe",
+  };
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <History className="w-5 h-5 text-primary" /> Scan history
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Everything you've scanned, safe or otherwise. Newest first.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={onRefresh} className="h-8 text-xs">Refresh</Button>
+          {history && history.length > 0 && (
+            <Button size="sm" variant="outline" onClick={onClear} className="h-8 text-xs text-destructive hover:text-destructive">
+              Clear all
+            </Button>
+          )}
+        </div>
+      </div>
+      {history === null ? (
+        <div className="bg-card border border-border rounded-2xl p-10 flex items-center justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : history.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center text-center">
+          <div className="w-14 h-14 rounded-2xl bg-secondary flex items-center justify-center mb-3">
+            <History className="w-7 h-7 text-muted-foreground" />
+          </div>
+          <h4 className="font-semibold">No scans yet</h4>
+          <p className="text-sm text-muted-foreground max-w-sm mt-1">
+            Run a scan from the dashboard and it'll show up here with its verdict and risk score.
+          </p>
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {history.map((h) => (
+            <li key={h.id} className="bg-card border border-border rounded-xl p-3 flex items-start gap-3">
+              <div className={cn("text-[10px] font-semibold px-2 py-1 rounded border uppercase tracking-wider shrink-0", verdictStyles[h.verdict] ?? verdictStyles.safe)}>
+                {verdictLabel[h.verdict] ?? h.verdict}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium truncate">{h.summary || "Scan"}</p>
+                  <span className="text-[10px] text-muted-foreground">Risk {h.risk_score}/100</span>
+                  {h.had_image && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground flex items-center gap-1">
+                      <Camera className="w-3 h-3" /> screenshot
+                    </span>
+                  )}
+                </div>
+                {h.snippet && (
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap break-words">{h.snippet}</p>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {new Date(h.created_at).toLocaleString()}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function StatCard({
