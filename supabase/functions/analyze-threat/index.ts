@@ -95,12 +95,18 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const content: string = (body.content ?? '').toString().trim();
     const source: string = (body.source ?? 'manual').toString().slice(0, 200);
+    const imageDataUrl: string | null =
+      typeof body.image === 'string' && body.image.startsWith('data:image/') ? body.image : null;
 
-    if (!content || content.length < 3) {
-      return json({ error: 'Please paste an email, message, or URL to scan.' }, 400);
+    if ((!content || content.length < 3) && !imageDataUrl) {
+      return json({ error: 'Paste text or attach a screenshot to scan.' }, 400);
     }
     if (content.length > 8000) {
       return json({ error: 'Content too long (max 8000 characters).' }, 400);
+    }
+    // Rough cap ~8MB base64 payload
+    if (imageDataUrl && imageDataUrl.length > 11_000_000) {
+      return json({ error: 'Screenshot too large (max ~8MB).' }, 400);
     }
 
     if (!LOVABLE_API_KEY) return json({ error: 'AI service unavailable' }, 500);
@@ -108,9 +114,15 @@ Deno.serve(async (req) => {
     const gateway = createGateway(LOVABLE_API_KEY);
     let parsed: Analysis;
     const promptText =
-      `Analyze this content for security threats. Keep the summary to 2-4 complete sentences. ` +
-      `Return evidence-based results only; do not invent identities or attackers.\n\n` +
-      `Content to analyze:\n"""\n${content}\n"""`;
+      `Analyze the provided content for security threats. Keep the summary to 2-4 complete sentences. ` +
+      `Return evidence-based results only; do not invent identities or attackers.` +
+      (imageDataUrl
+        ? ` A screenshot is attached — read visible sender addresses, subject, body copy, buttons, and any URLs shown; treat suspicious visual cues (spoofed logos, urgent language, mismatched sender domains) as indicators.`
+        : '') +
+      (content ? `\n\nText content:\n"""\n${content}\n"""` : '');
+
+    const userContent: any[] = [{ type: 'text', text: promptText }];
+    if (imageDataUrl) userContent.push({ type: 'image', image: imageDataUrl });
 
     const runModel = async (modelId: string) => {
       try {
@@ -118,7 +130,7 @@ Deno.serve(async (req) => {
           model: gateway(modelId),
           schema: AnalysisSchema,
           system: SYSTEM_PROMPT,
-          prompt: promptText,
+          messages: [{ role: 'user', content: userContent }],
         });
         return normalize(object as z.infer<typeof AnalysisSchema>);
       } catch (error) {
