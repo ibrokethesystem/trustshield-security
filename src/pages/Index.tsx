@@ -26,7 +26,18 @@ import {
   Activity,
   Calendar,
   Inbox,
+  Sparkles,
+  Send,
+  Gauge,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip as ReTooltip,
+} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -218,6 +229,37 @@ const Index = () => {
   const dismissedCount = useMemo(() => (threats ?? []).filter((t) => t.status !== "active").length, [threats]);
   const criticalCount = useMemo(() => activeThreats.filter((t) => t.severity === "critical" || t.severity === "high").length, [activeThreats]);
 
+  const securityScore = useMemo(() => {
+    const active = activeThreats.length;
+    const crit = activeThreats.filter((t) => t.severity === "critical").length;
+    const high = activeThreats.filter((t) => t.severity === "high").length;
+    const med = activeThreats.filter((t) => t.severity === "medium").length;
+    const low = activeThreats.filter((t) => t.severity === "low").length;
+    const penalty = crit * 25 + high * 15 + med * 7 + low * 3;
+    return Math.max(0, Math.min(100, 100 - penalty - Math.max(0, active - 4) * 2));
+  }, [activeThreats]);
+
+  const trendData = useMemo(() => {
+    const days: { day: string; threats: number; date: string }[] = [];
+    const now = new Date();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push({
+        date: key,
+        day: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        threats: 0,
+      });
+    }
+    (threats ?? []).forEach((t) => {
+      const key = t.created_at.slice(0, 10);
+      const bucket = days.find((d) => d.date === key);
+      if (bucket) bucket.threats += 1;
+    });
+    return days;
+  }, [threats]);
+
   const runScan = async () => {
     const content = scanText.trim();
     if (!content) {
@@ -250,9 +292,16 @@ const Index = () => {
           toast.warning("Legitimate — but proceed with caution", {
             description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
             duration: 12000,
+            style: { minWidth: "440px", padding: "20px" },
+            className: "text-base",
           });
         } else {
-          toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
+          toast.success("Looks safe", {
+            description: analysis.summary ?? "No threats found.",
+            duration: 10000,
+            style: { minWidth: "460px", padding: "22px" },
+            className: "text-base",
+          });
         }
       }
     } catch (err) {
@@ -386,11 +435,44 @@ const Index = () => {
         </header>
 
         {/* Stat cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
+          <SecurityScoreCard score={securityScore} />
           <StatCard icon={AlertTriangle} iconClass="text-destructive bg-destructive/10" label="Active threats" value={activeThreats.length} />
           <StatCard icon={ShieldCheck} iconClass="text-orange-400 bg-orange-400/10" label="High / critical" value={criticalCount} />
           <StatCard icon={CheckCircle2} iconClass="text-green-400 bg-green-400/10" label="Resolved" value={dismissedCount} />
         </div>
+
+        {/* Trend chart */}
+        <Card>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" /> Threats over the last 14 days
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Every confirmed threat you've scanned, grouped by day.
+              </p>
+            </div>
+          </div>
+          <div className="h-[180px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={trendData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} allowDecimals={false} width={30} />
+                <ReTooltip
+                  contentStyle={{
+                    background: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                />
+                <Line type="monotone" dataKey="threats" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: "hsl(var(--primary))" }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
 
         {/* Scanner */}
         <Card>
@@ -400,7 +482,7 @@ const Index = () => {
                 <ScanLine className="w-5 h-5 text-primary" /> Scan a message or link
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                Paste an email, text message, or URL. Trust Shield's AI checks it for phishing, scams, and malicious links.
+                Paste an email, text/SMS, chat message, URL, or QR-code text. Trust Shield's AI checks it for phishing, fake login pages, crypto/investment scams, impersonation, and other threats.
               </p>
             </div>
           </div>
@@ -540,6 +622,29 @@ const Index = () => {
   );
 };
 
+function SecurityScoreCard({ score }: { score: number }) {
+  const tone =
+    score >= 80
+      ? { ring: "text-green-400", bg: "bg-green-400/10", label: "Healthy" }
+      : score >= 60
+      ? { ring: "text-yellow-400", bg: "bg-yellow-400/10", label: "Watch" }
+      : score >= 40
+      ? { ring: "text-orange-400", bg: "bg-orange-400/10", label: "At risk" }
+      : { ring: "text-destructive", bg: "bg-destructive/10", label: "Critical" };
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4">
+      <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", tone.ring, tone.bg)}>
+        <Gauge className="w-5 h-5" />
+      </div>
+      <p className="text-2xl font-bold mt-3">
+        {score}
+        <span className="text-sm text-muted-foreground font-normal">/100</span>
+      </p>
+      <p className="text-xs text-muted-foreground mt-0.5">Security score · {tone.label}</p>
+    </div>
+  );
+}
+
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
 }
@@ -600,7 +705,37 @@ function ThreatRow({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [guardianOpen, setGuardianOpen] = useState(false);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const isActive = threat.status === "active";
+
+  const sendGuardian = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    const next = [...messages, { role: "user" as const, content: text }];
+    setMessages(next);
+    setInput("");
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("guardian-chat", {
+        body: { threat_id: threat.id, messages: next },
+      });
+      if (error) throw error;
+      const reply = (data as any)?.reply as string | undefined;
+      if (!reply) throw new Error("No reply");
+      setMessages((cur) => [...cur, { role: "assistant", content: reply }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Chat failed";
+      toast.error("Cyber Guardian error", { description: msg });
+      setMessages((cur) => cur.slice(0, -1));
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <li className={cn("bg-card border rounded-2xl p-4", isActive ? "border-border" : "border-border/50 opacity-60")}>
       <div className="flex items-start gap-3">
@@ -626,6 +761,13 @@ function ThreatRow({
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setOpen((v) => !v)} className="text-xs text-primary hover:underline">
               {open ? "Hide details" : "View details"}
+            </button>
+            <button
+              onClick={() => setGuardianOpen((v) => !v)}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              {guardianOpen ? "Close Cyber Guardian" : "Ask Cyber Guardian"}
             </button>
             {isActive && (
               <>
@@ -665,6 +807,65 @@ function ThreatRow({
                   <p className="text-muted-foreground">{threat.details.recommended_action}</p>
                 </div>
               )}
+            </div>
+          )}
+          {guardianOpen && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <p className="text-xs font-semibold">Cyber Guardian</p>
+                <span className="text-[10px] text-muted-foreground">AI assistant for this threat</span>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {messages.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Ask anything about this alert — "Why is this dangerous?", "What if I already clicked?", "How do I check if my account is safe?"
+                  </p>
+                )}
+                {messages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "text-xs rounded-lg px-3 py-2 whitespace-pre-wrap",
+                      m.role === "user"
+                        ? "bg-primary/10 text-foreground ml-8"
+                        : "bg-secondary/60 text-foreground mr-8"
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+                {sending && (
+                  <div className="bg-secondary/60 text-xs rounded-lg px-3 py-2 mr-8 inline-flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Thinking…
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendGuardian();
+                    }
+                  }}
+                  placeholder="Ask about this threat…"
+                  disabled={sending}
+                  className="h-8 text-xs"
+                />
+                <Button
+                  size="sm"
+                  onClick={sendGuardian}
+                  disabled={sending || !input.trim()}
+                  className="h-8 px-3 bg-gradient-shield hover:opacity-90"
+                >
+                  <Send className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

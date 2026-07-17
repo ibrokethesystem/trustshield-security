@@ -63,7 +63,11 @@ function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
 }
 
 const SYSTEM_PROMPT =
-  'You are Trust Shield, a security analyst. Analyze user-provided text, email bodies, SMS messages, chat messages, domains, or URLs for scams, phishing, hacking indicators, malware, credential theft, and data-corruption risk. Also evaluate residual risk even for legitimate sites, including tracking, data harvesting, redirects, look-alike domains, file tampering, and weak trust signals. Use cautious, evidence-based language. Every summary must end with a complete sentence.';
+  `You are Trust Shield, a security analyst. Analyze any user-provided content — email bodies, SMS/text messages, chat messages, social DMs, decoded QR code text, screenshots-of-login-page text, domains, or URLs — for the full range of consumer threats:
+phishing, fake login pages, brand impersonation, tech-support scams, romance/pig-butchering scams, cryptocurrency scams, investment/pump-and-dump scams, fake shopping sites, fake shipping/USPS/UPS/DHL scams, IRS/government/tax scams, job/employment scams, gift-card scams, sextortion, malware droppers, credential theft, account-takeover attempts, and hacking indicators.
+Also assess residual risk even for legitimate sites (tracking, data harvesting, aggressive redirects, look-alike domains, weak TLS, suspicious download prompts).
+Use cautious, evidence-based language. Never invent identities, attackers, or countries.
+Every summary must consist of 2-4 complete sentences and end with a period.`;
 
 const createGateway = (apiKey: string) =>
   createOpenAICompatible({
