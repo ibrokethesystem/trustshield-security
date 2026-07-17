@@ -226,7 +226,7 @@ const Index = () => {
         setScanText("");
         await loadThreats();
       } else {
-        toast.success("Looks safe", { description: analysis.summary?.slice(0, 140) ?? "No threats found." });
+        toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
@@ -560,7 +560,7 @@ function ThreatRow({
               </span>
             )}
           </div>
-          {threat.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{threat.description}</p>}
+          {threat.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{threat.description}</p>}
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setOpen((v) => !v)} className="text-xs text-primary hover:underline">
               {open ? "Hide details" : "View details"}
