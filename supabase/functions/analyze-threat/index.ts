@@ -1,23 +1,38 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createOpenAICompatible } from 'npm:@ai-sdk/openai-compatible';
+import { generateObject } from 'npm:ai';
+import { z } from 'npm:zod';
 
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!;
 
-interface Analysis {
-  is_threat: boolean;
-  threat_type: 'phishing' | 'scam' | 'hack' | 'suspicious_link' | 'other';
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  title: string;
-  summary: string;
-  indicators: string[];
-  suspicious_urls: string[];
-  recommended_action: string;
-  risk_score: number;
-  risk_level: 'safe' | 'low' | 'elevated' | 'high';
-  risk_warnings: string[];
-}
+const AnalysisSchema = z.object({
+  is_threat: z.boolean(),
+  threat_type: z.enum(['phishing', 'scam', 'hack', 'suspicious_link', 'other']),
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  title: z.string().min(1).max(90),
+  summary: z.string().min(1).max(1200),
+  indicators: z.array(z.string()).default([]),
+  suspicious_urls: z.array(z.string()).default([]),
+  recommended_action: z.string().min(1).max(700),
+  risk_score: z.number().int().min(0).max(100),
+  risk_level: z.enum(['safe', 'low', 'elevated', 'high']),
+  risk_warnings: z.array(z.string()).default([]),
+});
+
+type Analysis = z.infer<typeof AnalysisSchema>;
+
+const SYSTEM_PROMPT =
+  'You are Trust Shield, a security analyst. Analyze user-provided text, email bodies, SMS messages, chat messages, domains, or URLs for scams, phishing, hacking indicators, malware, credential theft, and data-corruption risk. Also evaluate residual risk even for legitimate sites, including tracking, data harvesting, redirects, look-alike domains, file tampering, and weak trust signals. Use cautious, evidence-based language. Every summary must end with a complete sentence.';
+
+const createGateway = (apiKey: string) =>
+  createOpenAICompatible({
+    name: 'lovable-ai',
+    baseURL: 'https://ai.gateway.lovable.dev/v1',
+    headers: { 'Lovable-API-Key': apiKey },
+  });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -48,52 +63,25 @@ Deno.serve(async (req) => {
 
     if (!LOVABLE_API_KEY) return json({ error: 'AI service unavailable' }, 500);
 
-    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Lovable-Api-Key': LOVABLE_API_KEY,
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are Trust Shield, a security analyst. Analyze the user-provided text (email body, SMS, chat message, or URL) for scam, phishing, or hacking indicators. Look for: impersonated brands, urgency/pressure tactics, credential requests, payment demands, suspicious sender domains, mismatched or shortened URLs, malware download links, romance/investment scams, tech-support scams, extortion. ALSO: even when the source is a legitimate, well-known website or message, still evaluate residual hacking / data-corruption risk (e.g. tracking, data harvesting, weak TLS, third-party redirects, permissive login flows, brand look-alike domains, links that could still lead to credential theft, files that could be tampered with). Return STRICT JSON only.',
-          },
-          {
-            role: 'user',
-            content:
-              `Analyze the following for security threats and return JSON with this exact shape:\n` +
-              `{"is_threat":boolean,"threat_type":"phishing"|"scam"|"hack"|"suspicious_link"|"other","severity":"low"|"medium"|"high"|"critical","title":"short headline (max 70 chars)","summary":"one paragraph explanation for the user","indicators":["reason 1","reason 2"],"suspicious_urls":["url1"],"recommended_action":"what the user should do","risk_score":0-100 integer overall risk of hack/corruption/data-loss even if legitimate,"risk_level":"safe"|"low"|"elevated"|"high","risk_warnings":["specific residual risks to warn the user about even if the source is legitimate"]}\n\n` +
-              `Content to analyze:\n"""\n${content}\n"""`,
-          },
-        ],
-        response_format: { type: 'json_object' },
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error('AI gateway error', aiRes.status, errText);
-      if (aiRes.status === 429) return json({ error: 'Rate limit reached — try again in a moment.' }, 429);
-      if (aiRes.status === 402) return json({ error: 'AI credits exhausted. Add credits in workspace settings.' }, 402);
-      return json({ error: 'Analysis failed. Try again.' }, 502);
-    }
-
-    const aiJson = await aiRes.json();
-    const rawText: string = aiJson.choices?.[0]?.message?.content ?? '{}';
+    const gateway = createGateway(LOVABLE_API_KEY);
     let parsed: Analysis;
     try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      try {
-        parsed = extractJSON(rawText);
-      } catch (e) {
-        console.error('Could not parse analysis, raw:', rawText, e);
-        return json({ error: 'Could not parse analysis' }, 502);
-      }
+      const { object } = await generateObject({
+        model: gateway('google/gemini-2.5-flash'),
+        schema: AnalysisSchema,
+        system: SYSTEM_PROMPT,
+        prompt:
+          `Analyze this content for security threats. Keep the summary to 2-4 complete sentences. ` +
+          `Return evidence-based results only; do not invent identities or attackers.\n\n` +
+          `Content to analyze:\n"""\n${content}\n"""`,
+      });
+      parsed = object;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('AI structured analysis failed', message);
+      if (message.includes('429')) return json({ error: 'Rate limit reached — try again in a moment.' }, 429);
+      if (message.includes('402')) return json({ error: 'AI credits exhausted. Add credits in workspace settings.' }, 402);
+      parsed = createBasicAnalysis(content);
     }
 
     // Only insert into DB if it's actually a threat
@@ -138,18 +126,53 @@ function json(body: unknown, status: number) {
   });
 }
 
-function extractJSON(raw: string): Analysis {
-  let cleaned = raw
-    .replace(/^\s*```(?:json)?\s*/i, '')
-    .replace(/```\s*$/i, '')
-    .trim();
+function createBasicAnalysis(content: string): Analysis {
+  const urls = extractUrls(content);
+  const text = content.toLowerCase();
+  const indicators: string[] = [];
 
-  if (!cleaned.startsWith('{')) {
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start === -1 || end <= start) throw new Error('No JSON object found');
-    cleaned = cleaned.slice(start, end + 1);
-  }
+  const pressureWords = ['urgent', 'immediately', 'final warning', 'verify now', 'act now', 'limited time'];
+  const credentialWords = ['password', 'login', 'verify your account', 'confirm your account', 'security code', 'one-time code'];
+  const paymentWords = ['gift card', 'wire transfer', 'crypto', 'bitcoin', 'cashapp', 'zelle'];
 
-  return JSON.parse(cleaned);
+  if (pressureWords.some((word) => text.includes(word))) indicators.push('Uses urgency or pressure language.');
+  if (credentialWords.some((word) => text.includes(word))) indicators.push('Asks for account access, credentials, or verification codes.');
+  if (paymentWords.some((word) => text.includes(word))) indicators.push('Mentions high-risk payment methods often used in scams.');
+  if (urls.some((url) => isSuspiciousUrl(url))) indicators.push('Contains a URL with suspicious link patterns.');
+
+  const isThreat = indicators.length > 0;
+  const riskScore = Math.min(95, urls.length > 0 ? 35 + indicators.length * 20 : indicators.length * 25);
+
+  return {
+    is_threat: isThreat,
+    threat_type: urls.length > 0 ? 'suspicious_link' : isThreat ? 'scam' : 'other',
+    severity: riskScore >= 75 ? 'high' : riskScore >= 45 ? 'medium' : 'low',
+    title: isThreat ? 'Potential risk found' : 'No clear threat found',
+    summary: isThreat
+      ? 'Trust Shield could not complete the advanced AI scan, so it ran a basic safety check instead. The content includes common scam or hacking warning signs, so avoid opening links, sharing codes, or entering account details until you verify the source independently.'
+      : 'Trust Shield could not complete the advanced AI scan, so it ran a basic safety check instead. No obvious scam or hacking indicators were found, but you should still verify unexpected links or requests before sharing private information.',
+    indicators,
+    suspicious_urls: urls.filter((url) => isSuspiciousUrl(url)),
+    recommended_action: isThreat
+      ? 'Do not click links or reply until you confirm the sender through an official website or trusted contact method.'
+      : 'Proceed carefully and verify the source if the message was unexpected.',
+    risk_score: riskScore,
+    risk_level: riskScore >= 70 ? 'high' : riskScore >= 40 ? 'elevated' : riskScore > 0 ? 'low' : 'safe',
+    risk_warnings: urls.length > 0 ? ['Links can still redirect or collect data even when they appear legitimate.'] : [],
+  };
+}
+
+function extractUrls(content: string): string[] {
+  const matches = content.match(/(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>]*)?/gi);
+  return [...new Set(matches ?? [])];
+}
+
+function isSuspiciousUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    /bit\.ly|tinyurl|t\.co|goo\.gl|ow\.ly|is\.gd/.test(lower) ||
+    /login|verify|secure|account|password|wallet|prize|free|gift/.test(lower) ||
+    /\.(zip|mov|scr|exe|js|msi)(?:$|[/?#])/.test(lower) ||
+    /xn--/.test(lower)
+  );
 }
