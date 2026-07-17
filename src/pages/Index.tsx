@@ -124,6 +124,29 @@ const Index = () => {
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [appInstalled, setAppInstalled] = useState(false);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    const onInstalled = () => {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    // Detect if already running as an installed app
+    if (window.matchMedia?.("(display-mode: standalone)").matches) {
+      setAppInstalled(true);
+    }
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
 
   const submissionsKey = user ? `ts_submissions_${user.id}` : "";
   useEffect(() => {
