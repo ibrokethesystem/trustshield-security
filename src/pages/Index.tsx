@@ -160,6 +160,7 @@ const Index = () => {
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [appInstalled, setAppInstalled] = useState(false);
+  const [fileScanning, setFileScanning] = useState(false);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
