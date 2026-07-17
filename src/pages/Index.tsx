@@ -516,6 +516,36 @@ const Index = () => {
           Warns you before loading dangerous URLs in Chrome.
         </p>
 
+        <button
+          onClick={async () => {
+            try {
+              const meta = await fetch("/TrustShield-mac-arm64.zip.asset.json").then((r) => r.json());
+              const res = await fetch(meta.url);
+              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+              const blob = await res.blob();
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = "TrustShield-mac-arm64.zip";
+              a.click();
+              URL.revokeObjectURL(a.href);
+              toast.success("Mac app downloaded", {
+                description:
+                  "Unzip, then drag TrustShield.app to Applications. First launch: right-click → Open to bypass Gatekeeper.",
+                duration: 9000,
+              });
+            } catch (err: any) {
+              toast.error(err?.message ?? "Download failed");
+            }
+          }}
+          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
+        >
+          <Download className="w-4 h-4" />
+          <span className="flex-1 text-left font-medium">Install on Mac</span>
+        </button>
+        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
+          Native macOS app (Apple Silicon).
+        </p>
+
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
             onClick={() => setProfileOpen(true)}
