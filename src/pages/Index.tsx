@@ -96,6 +96,8 @@ const Index = () => {
   const [threats, setThreats] = useState<Threat[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanText, setScanText] = useState("");
+  const [scanImage, setScanImage] = useState<{ dataUrl: string; name: string } | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -262,14 +264,18 @@ const Index = () => {
 
   const runScan = async () => {
     const content = scanText.trim();
-    if (!content) {
-      toast.error("Nothing to scan", { description: "Paste an email, message, or URL first." });
+    if (!content && !scanImage) {
+      toast.error("Nothing to scan", { description: "Paste text or attach a screenshot first." });
       return;
     }
     setScanning(true);
     try {
       const { data, error } = await supabase.functions.invoke("analyze-threat", {
-        body: { content, source: "manual_scan" },
+        body: {
+          content,
+          image: scanImage?.dataUrl ?? null,
+          source: scanImage ? "screenshot_scan" : "manual_scan",
+        },
       });
       if (error) throw error;
       const analysis = (data as any)?.analysis;
@@ -283,6 +289,7 @@ const Index = () => {
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
+        setScanImage(null);
         await loadThreats();
       } else {
         const level = analysis.risk_level as string | undefined;
@@ -303,6 +310,7 @@ const Index = () => {
             className: "trust-bottom-toast text-base",
           });
         }
+        setScanImage(null);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
@@ -310,6 +318,28 @@ const Index = () => {
     } finally {
       setScanning(false);
     }
+  };
+
+  const handleImagePick = (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Screenshot must be under 8MB");
+      return;
+    }
+    setImageLoading(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setScanImage({ dataUrl: String(reader.result), name: file.name });
+      setImageLoading(false);
+    };
+    reader.onerror = () => {
+      setImageLoading(false);
+      toast.error("Couldn't read that image");
+    };
+    reader.readAsDataURL(file);
   };
 
   const updateStatus = async (id: string, status: "dismissed" | "blocked") => {
@@ -489,16 +519,53 @@ const Index = () => {
           <Textarea
             value={scanText}
             onChange={(e) => setScanText(e.target.value)}
-            placeholder="Paste suspicious email content, a text message, or a URL like https://example.com/login…"
+            placeholder="Paste suspicious email content, a text message, a URL — or attach a screenshot below…"
             className="min-h-[120px] bg-secondary/50 border-border resize-none"
             maxLength={8000}
             disabled={scanning}
           />
+          {scanImage ? (
+            <div className="mt-3 flex items-start gap-3 p-3 rounded-lg border border-border bg-secondary/40">
+              <img src={scanImage.dataUrl} alt="" className="w-20 h-20 rounded-md object-cover border border-border" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate">{scanImage.name}</p>
+                <p className="text-[11px] text-muted-foreground">Screenshot attached — will be analyzed with your text.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setScanImage(null)}
+                disabled={scanning}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
+            <div className="flex items-center gap-3">
+              <label className={cn(
+                "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
+                scanning || imageLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-secondary/60 bg-secondary/30"
+              )}>
+                {imageLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+                {scanImage ? "Replace screenshot" : "Attach screenshot"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={scanning || imageLoading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleImagePick(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
+            </div>
             <Button
               onClick={runScan}
-              disabled={scanning || scanText.trim().length < 3}
+              disabled={scanning || (scanText.trim().length < 3 && !scanImage)}
               className="bg-gradient-shield hover:opacity-90 glow-shield gap-2"
             >
               {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
