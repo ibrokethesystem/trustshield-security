@@ -513,6 +513,15 @@ const Index = () => {
               <Label>Email</Label>
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
+            <div className="pt-3 border-t border-border">
+              <p className="text-sm font-semibold mb-3">Account activity</p>
+              <div className="grid grid-cols-2 gap-3">
+                <AccountStat icon={Calendar} label="Days since sign-in" value={daysSinceSignIn} />
+                <AccountStat icon={Inbox} label="Items scanned" value={submissions} />
+                <AccountStat icon={AlertTriangle} label="Threats found" value={(threats ?? []).length} />
+                <AccountStat icon={CheckCircle2} label="Resolved" value={dismissedCount} />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProfileOpen(false)}>Close</Button>
