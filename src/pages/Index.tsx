@@ -566,6 +566,28 @@ function StatCard({
   );
 }
 
+function AccountStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="bg-secondary/40 border border-border rounded-lg p-3 flex items-center gap-3">
+      <div className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-lg font-semibold leading-none">{value}</p>
+        <p className="text-[11px] text-muted-foreground mt-1">{label}</p>
+      </div>
+    </div>
+  );
+}
+
 function ThreatRow({
   threat,
   onDismiss,
