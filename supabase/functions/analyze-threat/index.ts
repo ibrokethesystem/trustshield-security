@@ -180,6 +180,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Apply shared URL heuristics (same rules as the Chrome extension) so any
+    // URL the extension would warn on also boosts Trust Shield's verdict.
+    if (content) parsed = applyHeuristics(parsed, content);
+
     // Only insert into DB if it's actually a threat
     let threatId: string | null = null;
     if (parsed.is_threat) {
@@ -302,4 +306,126 @@ function isSuspiciousUrl(url: string): boolean {
     /\.(zip|mov|scr|exe|js|msi)(?:$|[/?#])/.test(lower) ||
     /xn--/.test(lower)
   );
+}
+
+// ============================================================================
+// Shared URL heuristics — mirrors extension/background.js analyzeUrl().
+// Keeps the in-app scanner and the Chrome extension in verdict-lockstep so any
+// URL the extension would warn on also raises Trust Shield's risk score.
+// ============================================================================
+const SUSPICIOUS_TLDS = ['zip','mov','xyz','top','tk','ml','ga','cf','gq','click','country','kim','work','loan','review','science','party'];
+const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','is.gd','buff.ly','cutt.ly','rebrand.ly','shorte.st'];
+const BRAND_KEYWORDS = ['paypal','apple','microsoft','amazon','google','facebook','instagram','netflix','chase','wellsfargo','bankofamerica','coinbase','binance','usps','ups','fedex','dhl','irs'];
+const RISKY_PATH_WORDS = ['login','verify','secure','account','update','confirm','wallet','gift','prize','free','password','signin','unlock'];
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+  }
+  return dp[m][n];
+}
+
+function analyzeUrlHeuristics(rawUrl: string): { risk: number; reasons: string[]; host: string | null } {
+  let u: URL;
+  try {
+    u = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `http://${rawUrl}`);
+  } catch {
+    return { risk: 0, reasons: [], host: null };
+  }
+  const host = u.hostname.toLowerCase();
+  const path = (u.pathname + u.search).toLowerCase();
+  const reasons: string[] = [];
+  let risk = 0;
+
+  if (u.protocol === 'http:' && /^https?:\/\//i.test(rawUrl)) {
+    risk += 20; reasons.push('Site does not use HTTPS encryption.');
+  }
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+    risk += 40; reasons.push('URL uses a raw IP address instead of a domain name.');
+  }
+  if (host.includes('xn--')) {
+    risk += 35; reasons.push('Hostname uses punycode — can disguise look-alike domains.');
+  }
+  const tld = host.split('.').pop() ?? '';
+  if (SUSPICIOUS_TLDS.includes(tld)) {
+    risk += 25; reasons.push(`Uncommon or abuse-prone top-level domain (.${tld}).`);
+  }
+  if (SHORTENERS.includes(host)) {
+    risk += 30; reasons.push('Link shortener hides the real destination.');
+  }
+  const parts = host.split('.');
+  if (parts.length >= 5) { risk += 15; reasons.push('Unusually deep subdomain chain.'); }
+
+  const registrable = parts.slice(-2).join('.');
+  const sld = parts.length >= 2 ? parts[parts.length - 2] : host;
+  for (const brand of BRAND_KEYWORDS) {
+    if (host.includes(brand) && !registrable.startsWith(brand + '.')) {
+      risk += 30; reasons.push(`Contains the "${brand}" brand outside its real domain.`); break;
+    }
+    if (sld.length >= 4 && sld !== brand && levenshtein(sld, brand) === 1) {
+      risk += 35; reasons.push(`Domain looks like a misspelling of "${brand}".`); break;
+    }
+  }
+
+  const pathHits = RISKY_PATH_WORDS.filter((w) => path.includes(w));
+  if (pathHits.length) {
+    risk += 10 + pathHits.length * 5;
+    reasons.push('URL path uses credential-harvesting keywords (' + pathHits.slice(0, 3).join(', ') + ').');
+  }
+  if (/\.(exe|scr|msi|bat|cmd|zip|mov|js)(\?|$)/i.test(u.pathname)) {
+    risk += 30; reasons.push('URL points to an executable or archive download.');
+  }
+  if (rawUrl.includes('@') && rawUrl.indexOf('@') < (rawUrl.indexOf('?') === -1 ? rawUrl.length : rawUrl.indexOf('?'))) {
+    risk += 25; reasons.push("URL contains an '@' — can redirect to a different host than it appears.");
+  }
+
+  return { risk: Math.min(100, risk), reasons, host };
+}
+
+function applyHeuristics(analysis: Analysis, content: string): Analysis {
+  const urls = _extractUrls(content);
+  if (!urls.length) return analysis;
+
+  let bestRisk = 0;
+  const newReasons: string[] = [];
+  const flaggedUrls: string[] = [];
+  for (const url of urls) {
+    const { risk, reasons, host } = analyzeUrlHeuristics(url);
+    if (risk >= 30) {
+      flaggedUrls.push(url);
+      for (const r of reasons) if (!newReasons.includes(r)) newReasons.push(r);
+    }
+    if (risk > bestRisk) bestRisk = risk;
+    // silence unused
+    void host;
+  }
+  if (bestRisk < 30 && !flaggedUrls.length) return analysis;
+
+  // Merge: raise score to at least the heuristic verdict; add indicators/urls.
+  const mergedIndicators = [...analysis.indicators];
+  for (const r of newReasons) if (!mergedIndicators.includes(r)) mergedIndicators.push(r);
+  const mergedUrls = [...analysis.suspicious_urls];
+  for (const u of flaggedUrls) if (!mergedUrls.includes(u)) mergedUrls.push(u);
+
+  const raisedScore = Math.max(analysis.risk_score, bestRisk);
+  const isThreat = analysis.is_threat || bestRisk >= 30;
+  const severity: Analysis['severity'] = raisedScore >= 75 ? 'high' : raisedScore >= 45 ? 'medium' : analysis.severity;
+
+  return {
+    ...analysis,
+    is_threat: isThreat,
+    indicators: mergedIndicators,
+    suspicious_urls: mergedUrls,
+    risk_score: raisedScore,
+    risk_level: raisedScore >= 70 ? 'high' : raisedScore >= 40 ? 'elevated' : raisedScore > 0 ? 'low' : 'safe',
+    severity,
+    threat_type: isThreat && analysis.threat_type === 'other' ? 'suspicious_link' : analysis.threat_type,
+    title: isThreat && !analysis.is_threat ? 'Suspicious link detected' : analysis.title,
+  };
 }
