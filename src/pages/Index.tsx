@@ -31,6 +31,7 @@ import {
   Gauge,
   History,
   Download,
+  FileScan,
 } from "lucide-react";
 import {
   LineChart,
