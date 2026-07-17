@@ -23,7 +23,10 @@ const NAME: Record<string, string> = Object.fromEntries(
 );
 
 const STORAGE_KEY = "ts_language";
-const CACHE_KEY = "ts_translation_cache_v1";
+// Bumped: v1 poisoned entries with English fallbacks when a chunk failed,
+// which permanently broke Hindi/Tamil for existing users. v2 also never
+// caches failed translations, so retries happen automatically.
+const CACHE_KEY = "ts_translation_cache_v2";
 // Cache of original English text per node, so we can restore or re-translate.
 const originals = new WeakMap<Text, string>();
 // { [lang]: { [english]: translated } }
@@ -99,11 +102,16 @@ async function translateBatch(strings: string[], target: string): Promise<Record
       if (error) throw error;
       const translations: string[] = data?.translations || [];
       chunk.forEach((src, i) => {
-        langCache[src] = translations[i] || src;
+        const t = translations[i];
+        // Only cache real translations. Never store the English source as a
+        // "translation" — that would poison the cache and stop future retries.
+        if (typeof t === "string" && t.trim() && t.trim() !== src.trim()) {
+          langCache[src] = t;
+        }
       });
     } catch (err) {
       console.error("translate chunk failed", err);
-      chunk.forEach((src) => { langCache[src] = src; });
+      // Do NOT cache failures — let the next apply retry them.
     }
   }
   persistCache();
