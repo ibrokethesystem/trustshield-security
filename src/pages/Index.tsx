@@ -539,43 +539,6 @@ const Index = () => {
           Warns you before loading dangerous URLs in Chrome.
         </p>
 
-        <button
-          onClick={async () => {
-            if (appInstalled) {
-              toast.success("Trust Shield is already installed", {
-                description: "Launch it from your Applications folder, Launchpad, or Dock.",
-                duration: 6000,
-              });
-              return;
-            }
-            if (installPrompt) {
-              installPrompt.prompt();
-              const { outcome } = await installPrompt.userChoice;
-              if (outcome === "accepted") {
-                toast.success("Installing Trust Shield…", {
-                  description: "It will appear as a standalone app on your device.",
-                  duration: 6000,
-                });
-              }
-              setInstallPrompt(null);
-              return;
-            }
-            toast.info("One-click install unavailable in this browser", {
-              description:
-                "In Chrome/Edge on desktop: click the install icon in the address bar (or ⋮ → Install Trust Shield). On iPhone Safari: Share → Add to Home Screen.",
-              duration: 9000,
-            });
-          }}
-          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
-        >
-          <Download className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">
-            {appInstalled ? "App installed" : "Install app"}
-          </span>
-        </button>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          One-click install — no unzipping. Works on Mac, Windows, Chromebook & Android via Chrome/Edge.
-        </p>
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
             onClick={() => setProfileOpen(true)}
