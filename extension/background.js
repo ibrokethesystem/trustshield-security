@@ -126,7 +126,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const forceBlocked = (state.blocklist || []).includes(host);
   const { risk, reasons } = analyzeUrl(url);
 
-  if (forceBlocked || risk >= 40) {
+  if (forceBlocked || risk >= 30) {
     bumpStats({ warned: 1 });
     const warn = chrome.runtime.getURL("warning.html")
       + "?url=" + encodeURIComponent(url)
