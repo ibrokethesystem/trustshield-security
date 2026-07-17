@@ -589,9 +589,9 @@ const Index = () => {
           </div>
           <div className="h-[180px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 6, right: 8, left: -20, bottom: 0 }}>
+              <LineChart data={trendData} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
                 <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} allowDecimals={false} width={30} />
+                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} allowDecimals={false} width={36} tickMargin={6} />
                 <ReTooltip
                   contentStyle={{
                     background: "hsl(var(--card))",
