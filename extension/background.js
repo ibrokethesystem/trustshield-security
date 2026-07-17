@@ -8,6 +8,40 @@ const SHORTENERS = ["bit.ly","tinyurl.com","t.co","goo.gl","ow.ly","is.gd","buff
 const BRAND_KEYWORDS = ["paypal","apple","microsoft","amazon","google","facebook","instagram","netflix","chase","wellsfargo","bankofamerica","coinbase","binance","usps","ups","fedex","dhl","irs"];
 const RISKY_PATH_WORDS = ["login","verify","secure","account","update","confirm","wallet","gift","prize","free","password","signin","unlock"];
 
+// Trust Shield hosted rating endpoint (VirusTotal-backed).
+const RATING_ENDPOINT = "https://ewuaaaidxngjnjjkxfjo.supabase.co/functions/v1/rate-website";
+const RATING_APIKEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3dWFhYWlkeG5nam5qamt4ZmpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDY4MDcsImV4cCI6MjA5OTc4MjgwN30.xOZdxZNd1wWsvIsyz0E5j5f1T_xVYg52u29eYeGH6a0";
+const ratingCache = new Map(); // host -> { rating, risk, ts }
+const RATING_TTL_MS = 10 * 60 * 1000;
+
+async function fetchWebsiteRating(url) {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const cached = ratingCache.get(host);
+    if (cached && Date.now() - cached.ts < RATING_TTL_MS) return cached;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+    const res = await fetch(RATING_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": RATING_APIKEY },
+      body: JSON.stringify({ url }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const j = await res.json();
+    const out = {
+      rating: j.rating || "unknown",
+      risk: Number(j.risk_score || 0),
+      malicious: Number(j.malicious || 0),
+      suspicious: Number(j.suspicious || 0),
+      ts: Date.now(),
+    };
+    ratingCache.set(host, out);
+    return out;
+  } catch { return null; }
+}
+
 const DEFAULTS = {
   enabled: true,
   allowlist: [],        // hostnames user allowed
@@ -126,13 +160,27 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const forceBlocked = (state.blocklist || []).includes(host);
   const { risk, reasons } = analyzeUrl(url);
 
-  if (forceBlocked || risk >= 30) {
+  // Blend in VirusTotal-backed website rating from Trust Shield's API.
+  const rating = await fetchWebsiteRating(url);
+  let totalRisk = risk;
+  const totalReasons = reasons.slice();
+  if (rating) {
+    totalRisk = Math.min(100, totalRisk + rating.risk);
+    if (rating.rating === "malicious") {
+      totalReasons.unshift(`VirusTotal: ${rating.malicious} security vendor(s) flagged this URL as malicious.`);
+    } else if (rating.rating === "suspicious") {
+      totalReasons.unshift(`VirusTotal: ${rating.suspicious} security vendor(s) flagged this URL as suspicious.`);
+    }
+  }
+
+  if (forceBlocked || totalRisk >= 30 || rating?.rating === "malicious") {
     bumpStats({ warned: 1 });
     const warn = chrome.runtime.getURL("warning.html")
       + "?url=" + encodeURIComponent(url)
-      + "&risk=" + risk
-      + "&reasons=" + encodeURIComponent(JSON.stringify(reasons))
-      + "&blocked=" + (forceBlocked ? "1" : "0");
+      + "&risk=" + totalRisk
+      + "&reasons=" + encodeURIComponent(JSON.stringify(totalReasons))
+      + "&blocked=" + (forceBlocked ? "1" : "0")
+      + "&rating=" + encodeURIComponent(rating?.rating || "unknown");
     chrome.tabs.update(details.tabId, { url: warn });
   }
 });

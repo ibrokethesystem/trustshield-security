@@ -31,6 +31,7 @@ import {
   Gauge,
   History,
   Download,
+  FileScan,
 } from "lucide-react";
 import {
   LineChart,
@@ -159,6 +160,7 @@ const Index = () => {
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [appInstalled, setAppInstalled] = useState(false);
+  const [fileScanning, setFileScanning] = useState(false);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -468,6 +470,69 @@ const Index = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleFileScan = async (file: File) => {
+    if (file.size > 30 * 1024 * 1024) {
+      toast.error("File too large", { description: "Maximum 30MB for scanning." });
+      return;
+    }
+    setFileScanning(true);
+    try {
+      const b64 = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      const { data, error } = await supabase.functions.invoke("scan-file", {
+        body: { file_base64: b64, filename: file.name },
+      });
+      if (error) throw error;
+      const res = data as any;
+      const verdict = res?.verdict as "safe" | "caution" | "threat";
+      const score = Number(res?.risk_score ?? 0);
+      const stats = res?.stats ?? {};
+      const summary = `${stats.malicious ?? 0} engines flagged malicious, ${stats.suspicious ?? 0} suspicious out of ${res?.total_engines ?? 0}.`;
+      await supabase.from("scan_history").insert({
+        user_id: user!.id,
+        verdict,
+        risk_score: score,
+        risk_level: verdict === "threat" ? "high" : verdict === "caution" ? "elevated" : "low",
+        summary: `File scan: ${file.name}`,
+        snippet: summary,
+        had_image: false,
+        threat_id: null,
+      });
+      if (verdict === "threat") {
+        toast.error("Malicious file detected", {
+          description: `${file.name} — ${summary}`,
+          duration: 12000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
+      } else if (verdict === "caution") {
+        toast.warning("File looks suspicious", {
+          description: `${file.name} — ${summary}`,
+          duration: 12000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
+      } else {
+        toast.success("File looks clean", {
+          description: `${file.name} — ${summary}`,
+          duration: 8000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
+      }
+      if (view === "history") loadHistory();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "File scan failed";
+      toast.error("File scan failed", { description: msg });
+    } finally {
+      setFileScanning(false);
+    }
+  };
+
   const updateStatus = async (id: string, status: "dismissed" | "blocked") => {
     const prev = threats;
     setThreats((cur) => (cur ?? []).map((t) => (t.id === id ? { ...t, status } : t)));
@@ -716,6 +781,23 @@ const Index = () => {
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (f) handleImagePick(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <label className={cn(
+                "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
+                fileScanning || scanning ? "opacity-50 cursor-not-allowed" : "hover:bg-secondary/60 bg-secondary/30"
+              )}>
+                {fileScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileScan className="w-3.5 h-3.5" />}
+                {fileScanning ? "Scanning file…" : "Scan a file"}
+                <input
+                  type="file"
+                  className="hidden"
+                  disabled={fileScanning || scanning}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileScan(f);
                     e.target.value = "";
                   }}
                 />
