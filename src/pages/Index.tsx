@@ -292,14 +292,22 @@ const Index = () => {
           toast.warning("Legitimate — but proceed with caution", {
             description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
             duration: 12000,
-            style: { minWidth: "440px", padding: "20px" },
+            style: {
+              width: "min(100vw - 24px, 1100px)",
+              padding: "20px 28px",
+              animation: "slide-in-up 0.35s ease-out",
+            },
             className: "text-base",
           });
         } else {
           toast.success("Looks safe", {
             description: analysis.summary ?? "No threats found.",
             duration: 10000,
-            style: { minWidth: "460px", padding: "22px" },
+            style: {
+              width: "min(100vw - 24px, 1100px)",
+              padding: "22px 28px",
+              animation: "slide-in-up 0.35s ease-out",
+            },
             className: "text-base",
           });
         }
