@@ -23,6 +23,9 @@ import {
   Ban,
   Camera,
   Pencil,
+  Activity,
+  Calendar,
+  Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,6 +92,14 @@ const Index = () => {
   const [nameDraft, setNameDraft] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [submissions, setSubmissions] = useState(0);
+
+  const submissionsKey = user ? `ts_submissions_${user.id}` : "";
+  useEffect(() => {
+    if (!submissionsKey) return;
+    const v = parseInt(localStorage.getItem(submissionsKey) || "0", 10);
+    setSubmissions(isNaN(v) ? 0 : v);
+  }, [submissionsKey]);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth", { replace: true });
@@ -221,12 +232,28 @@ const Index = () => {
       if (error) throw error;
       const analysis = (data as any)?.analysis;
       if (!analysis) throw new Error("No analysis returned");
+      // Track submission count locally
+      if (submissionsKey) {
+        const next = submissions + 1;
+        setSubmissions(next);
+        localStorage.setItem(submissionsKey, String(next));
+      }
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
         await loadThreats();
       } else {
-        toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
+        const level = analysis.risk_level as string | undefined;
+        const warnings: string[] = analysis.risk_warnings ?? [];
+        const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
+        if ((level === "elevated" || level === "high" || score >= 40) && warnings.length > 0) {
+          toast.warning("Legitimate — but proceed with caution", {
+            description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
+            duration: 12000,
+          });
+        } else {
+          toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
