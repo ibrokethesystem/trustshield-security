@@ -49,8 +49,21 @@ function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
   const score = Math.max(0, Math.min(100, Math.round(Number(raw.risk_score) || 0)));
   const severity = pickEnum(raw.severity, SEVERITIES, 'medium');
   const threat_type = pickEnum(raw.threat_type, THREAT_TYPES, 'other');
-  const indicators = (raw.indicators ?? []).map((s) => String(s));
-  const suspicious_urls = (raw.suspicious_urls ?? []).map((s) => String(s));
+  const toStr = (s: any): string => {
+    if (s == null) return '';
+    if (typeof s === 'string') return s;
+    if (typeof s === 'object') {
+      return (
+        s.reason || s.text || s.description || s.indicator || s.message || s.label ||
+        s.url || s.href || s.link ||
+        Object.values(s).filter((v) => typeof v === 'string').join(' — ') ||
+        JSON.stringify(s)
+      );
+    }
+    return String(s);
+  };
+  const indicators = (raw.indicators ?? []).map(toStr).filter(Boolean);
+  const suspicious_urls = (raw.suspicious_urls ?? []).map(toStr).filter(Boolean);
   const summary = (raw.summary || '').slice(0, 1200);
   // Trust the model's is_threat by default. Only override to TRUE on strong,
   // unambiguous evidence — score >= 70, high/critical severity, or the model
