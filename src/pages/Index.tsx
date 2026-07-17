@@ -65,9 +65,9 @@ type Threat = {
   source: string | null;
   status: "active" | "dismissed" | "blocked";
   details: {
-    indicators?: string[];
-    suspicious_urls?: string[];
-    recommended_action?: string;
+    indicators?: unknown[];
+    suspicious_urls?: unknown[];
+    recommended_action?: unknown;
     original_snippet?: string;
   };
   created_at: string;
@@ -104,6 +104,39 @@ const typeLabels: Record<Threat["threat_type"], string> = {
   hack: "Hack attempt",
   suspicious_link: "Suspicious link",
   other: "Suspicious",
+};
+
+const displayReason = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "string") return value === "[object Object]" ? "Suspicious pattern detected." : value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(displayReason).filter(Boolean).join(" — ");
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const keys = [
+      "reason",
+      "text",
+      "description",
+      "indicator",
+      "message",
+      "label",
+      "detail",
+      "evidence",
+      "finding",
+      "warning",
+      "risk",
+      "url",
+      "href",
+      "link",
+    ];
+    for (const key of keys) {
+      const rendered = displayReason(record[key]);
+      if (rendered && rendered !== "Suspicious pattern detected.") return rendered;
+    }
+    const renderedValues = Object.values(record).map(displayReason).filter(Boolean);
+    return renderedValues[0] ?? "Suspicious pattern detected.";
+  }
+  return String(value);
 };
 
 const Index = () => {
@@ -1085,12 +1118,8 @@ function ThreatRow({
                 <div>
                   <p className="font-semibold mb-1">Why it looks suspicious</p>
                   <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                    {threat.details.indicators.map((i: any, idx) => {
-                      const text = typeof i === 'string'
-                        ? i
-                        : i && typeof i === 'object'
-                          ? (i.reason || i.text || i.description || i.indicator || i.message || i.label || Object.values(i).filter(v => typeof v === 'string').join(' — ') || JSON.stringify(i))
-                          : String(i);
+                    {threat.details.indicators.map((i: unknown, idx) => {
+                      const text = displayReason(i);
                       return <li key={idx}>{text}</li>;
                     })}
                   </ul>
@@ -1100,12 +1129,8 @@ function ThreatRow({
                 <div>
                   <p className="font-semibold mb-1 flex items-center gap-1"><Link2 className="w-3 h-3" /> Suspicious links</p>
                   <ul className="space-y-0.5 text-destructive font-mono break-all">
-                    {threat.details.suspicious_urls.map((u: any, idx) => {
-                      const text = typeof u === 'string'
-                        ? u
-                        : u && typeof u === 'object'
-                          ? (u.url || u.href || u.link || JSON.stringify(u))
-                          : String(u);
+                    {threat.details.suspicious_urls.map((u: unknown, idx) => {
+                      const text = displayReason(u);
                       return <li key={idx}>{text}</li>;
                     })}
                   </ul>
@@ -1114,7 +1139,7 @@ function ThreatRow({
               {threat.details.recommended_action && (
                 <div>
                   <p className="font-semibold mb-1">What to do</p>
-                  <p className="text-muted-foreground">{threat.details.recommended_action}</p>
+                  <p className="text-muted-foreground">{displayReason(threat.details.recommended_action)}</p>
                 </div>
               )}
             </div>

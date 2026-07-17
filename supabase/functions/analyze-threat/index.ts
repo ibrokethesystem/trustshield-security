@@ -14,12 +14,12 @@ const AnalysisSchema = z.object({
   severity: z.string(),
   title: z.string(),
   summary: z.string(),
-  indicators: z.array(z.string()),
-  suspicious_urls: z.array(z.string()),
+  indicators: z.array(z.unknown()),
+  suspicious_urls: z.array(z.unknown()),
   recommended_action: z.string(),
   risk_score: z.number(),
   risk_level: z.string(),
-  risk_warnings: z.array(z.string()),
+  risk_warnings: z.array(z.unknown()),
 });
 
 type Analysis = {
@@ -45,25 +45,50 @@ function pickEnum<T extends readonly string[]>(value: unknown, allowed: T, fallb
   return (allowed as readonly string[]).includes(v) ? (v as T[number]) : fallback;
 }
 
+function toDisplayString(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value === '[object Object]' ? '' : value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return value.map(toDisplayString).filter(Boolean).join(' — ');
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const preferred = [
+      'reason',
+      'text',
+      'description',
+      'indicator',
+      'message',
+      'label',
+      'detail',
+      'evidence',
+      'finding',
+      'warning',
+      'risk',
+      'url',
+      'href',
+      'link',
+    ];
+    for (const key of preferred) {
+      const rendered = toDisplayString(record[key]);
+      if (rendered) return rendered;
+    }
+    const renderedValues = Object.values(record).map(toDisplayString).filter(Boolean);
+    if (renderedValues.length) return renderedValues.join(' — ');
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '';
+    }
+  }
+  return String(value);
+}
+
 function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
   const score = Math.max(0, Math.min(100, Math.round(Number(raw.risk_score) || 0)));
   const severity = pickEnum(raw.severity, SEVERITIES, 'medium');
   const threat_type = pickEnum(raw.threat_type, THREAT_TYPES, 'other');
-  const toStr = (s: any): string => {
-    if (s == null) return '';
-    if (typeof s === 'string') return s;
-    if (typeof s === 'object') {
-      return (
-        s.reason || s.text || s.description || s.indicator || s.message || s.label ||
-        s.url || s.href || s.link ||
-        Object.values(s).filter((v) => typeof v === 'string').join(' — ') ||
-        JSON.stringify(s)
-      );
-    }
-    return String(s);
-  };
-  const indicators = (raw.indicators ?? []).map(toStr).filter(Boolean);
-  const suspicious_urls = (raw.suspicious_urls ?? []).map(toStr).filter(Boolean);
+  const indicators = (raw.indicators ?? []).map(toDisplayString).filter(Boolean);
+  const suspicious_urls = (raw.suspicious_urls ?? []).map(toDisplayString).filter(Boolean);
   const summary = (raw.summary || '').slice(0, 1200);
   // Trust the model's is_threat by default. Only override to TRUE on strong,
   // unambiguous evidence — score >= 70, high/critical severity, or the model
@@ -89,7 +114,7 @@ function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
     recommended_action: (raw.recommended_action || '').slice(0, 700),
     risk_score: is_threat ? Math.max(score, 60) : Math.min(score, 39),
     risk_level: pickEnum(raw.risk_level, RISK_LEVELS, score >= 70 ? 'high' : score >= 40 ? 'elevated' : score > 0 ? 'low' : 'safe'),
-    risk_warnings: (raw.risk_warnings ?? []).map((s) => String(s)),
+    risk_warnings: (raw.risk_warnings ?? []).map(toDisplayString).filter(Boolean),
   };
 }
 
@@ -294,12 +319,12 @@ function salvageJson(text: string): any | null {
       severity: String(obj.severity ?? 'medium'),
       title: String(obj.title ?? 'Scan result'),
       summary: String(obj.summary ?? ''),
-      indicators: Array.isArray(obj.indicators) ? obj.indicators.map(String) : [],
-      suspicious_urls: Array.isArray(obj.suspicious_urls) ? obj.suspicious_urls.map(String) : [],
+      indicators: Array.isArray(obj.indicators) ? obj.indicators.map(toDisplayString).filter(Boolean) : [],
+      suspicious_urls: Array.isArray(obj.suspicious_urls) ? obj.suspicious_urls.map(toDisplayString).filter(Boolean) : [],
       recommended_action: String(obj.recommended_action ?? ''),
       risk_score: Number(obj.risk_score ?? 0),
       risk_level: String(obj.risk_level ?? 'safe'),
-      risk_warnings: Array.isArray(obj.risk_warnings) ? obj.risk_warnings.map(String) : [],
+      risk_warnings: Array.isArray(obj.risk_warnings) ? obj.risk_warnings.map(toDisplayString).filter(Boolean) : [],
     };
   } catch {
     return null;
