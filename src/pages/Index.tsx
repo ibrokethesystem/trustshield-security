@@ -23,6 +23,9 @@ import {
   Ban,
   Camera,
   Pencil,
+  Activity,
+  Calendar,
+  Inbox,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,6 +92,14 @@ const Index = () => {
   const [nameDraft, setNameDraft] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [submissions, setSubmissions] = useState(0);
+
+  const submissionsKey = user ? `ts_submissions_${user.id}` : "";
+  useEffect(() => {
+    if (!submissionsKey) return;
+    const v = parseInt(localStorage.getItem(submissionsKey) || "0", 10);
+    setSubmissions(isNaN(v) ? 0 : v);
+  }, [submissionsKey]);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth", { replace: true });
@@ -221,12 +232,28 @@ const Index = () => {
       if (error) throw error;
       const analysis = (data as any)?.analysis;
       if (!analysis) throw new Error("No analysis returned");
+      // Track submission count locally
+      if (submissionsKey) {
+        const next = submissions + 1;
+        setSubmissions(next);
+        localStorage.setItem(submissionsKey, String(next));
+      }
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
         await loadThreats();
       } else {
-        toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
+        const level = analysis.risk_level as string | undefined;
+        const warnings: string[] = analysis.risk_warnings ?? [];
+        const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
+        if ((level === "elevated" || level === "high" || score >= 40) && warnings.length > 0) {
+          toast.warning("Legitimate — but proceed with caution", {
+            description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
+            duration: 12000,
+          });
+        } else {
+          toast.success("Looks safe", { description: analysis.summary ?? "No threats found." });
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
@@ -273,6 +300,10 @@ const Index = () => {
 
   const hasActive = activeThreats.length > 0;
   const initial = (displayName || user.email || "?").charAt(0).toUpperCase();
+  const signInIso = user.last_sign_in_at ?? user.created_at;
+  const daysSinceSignIn = signInIso
+    ? Math.max(0, Math.floor((Date.now() - new Date(signInIso).getTime()) / 86400000))
+    : 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex">
@@ -486,6 +517,15 @@ const Index = () => {
               <Label>Email</Label>
               <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
+            <div className="pt-3 border-t border-border">
+              <p className="text-sm font-semibold mb-3">Account activity</p>
+              <div className="grid grid-cols-2 gap-3">
+                <AccountStat icon={Calendar} label="Days since sign-in" value={daysSinceSignIn} />
+                <AccountStat icon={Inbox} label="Items scanned" value={submissions} />
+                <AccountStat icon={AlertTriangle} label="Threats found" value={(threats ?? []).length} />
+                <AccountStat icon={CheckCircle2} label="Resolved" value={dismissedCount} />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProfileOpen(false)}>Close</Button>
@@ -522,6 +562,28 @@ function StatCard({
       </div>
       <p className="text-2xl font-bold mt-3">{value}</p>
       <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+function AccountStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="bg-secondary/40 border border-border rounded-lg p-3 flex items-center gap-3">
+      <div className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
+        <Icon className="w-4 h-4 text-muted-foreground" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-lg font-semibold leading-none">{value}</p>
+        <p className="text-[11px] text-muted-foreground mt-1">{label}</p>
+      </div>
     </div>
   );
 }
