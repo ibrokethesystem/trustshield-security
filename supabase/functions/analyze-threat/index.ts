@@ -52,17 +52,19 @@ function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
   const indicators = (raw.indicators ?? []).map((s) => String(s));
   const suspicious_urls = (raw.suspicious_urls ?? []).map((s) => String(s));
   const summary = (raw.summary || '').slice(0, 1200);
-  const maliciousText = /malicious|phishing|scam|fraud|dangerous|do not click|credential (theft|harvest)|spoof/i.test(
-    `${raw.title ?? ''} ${summary} ${indicators.join(' ')}`,
-  );
-  const is_threat =
-    !!raw.is_threat ||
-    score >= 60 ||
-    severity === 'high' ||
-    severity === 'critical' ||
-    suspicious_urls.length > 0 ||
-    (threat_type !== 'other' && indicators.length > 0) ||
-    maliciousText;
+  // Trust the model's is_threat by default. Only override to TRUE on strong,
+  // unambiguous evidence — score >= 70, high/critical severity, or the model
+  // itself listed suspicious URLs while also scoring the item as risky.
+  // Keyword scanning ("malicious", "scam") caused false alarms because the
+  // summary often uses those words in a NEGATIVE context ("no signs of
+  // phishing", "not a scam"). Also override to FALSE when the score is clearly
+  // safe, so a stray is_threat=true from the model doesn't create a fake alert.
+  let is_threat = !!raw.is_threat;
+  if (score >= 70 || severity === 'high' || severity === 'critical') is_threat = true;
+  if (suspicious_urls.length > 0 && score >= 60) is_threat = true;
+  if (score < 40 && severity !== 'high' && severity !== 'critical' && suspicious_urls.length === 0) {
+    is_threat = false;
+  }
   return {
     is_threat,
     threat_type: is_threat && threat_type === 'other' ? (suspicious_urls.length > 0 ? 'suspicious_link' : 'scam') : threat_type,
@@ -72,7 +74,7 @@ function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
     indicators,
     suspicious_urls,
     recommended_action: (raw.recommended_action || '').slice(0, 700),
-    risk_score: is_threat ? Math.max(score, 60) : score,
+    risk_score: is_threat ? Math.max(score, 60) : Math.min(score, 39),
     risk_level: pickEnum(raw.risk_level, RISK_LEVELS, score >= 70 ? 'high' : score >= 40 ? 'elevated' : score > 0 ? 'low' : 'safe'),
     risk_warnings: (raw.risk_warnings ?? []).map((s) => String(s)),
   };
