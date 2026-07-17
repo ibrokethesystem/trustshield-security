@@ -14,6 +14,9 @@ interface Analysis {
   indicators: string[];
   suspicious_urls: string[];
   recommended_action: string;
+  risk_score: number;
+  risk_level: 'safe' | 'low' | 'elevated' | 'high';
+  risk_warnings: string[];
 }
 
 Deno.serve(async (req) => {
@@ -57,13 +60,13 @@ Deno.serve(async (req) => {
           {
             role: 'system',
             content:
-              'You are Trust Shield, a security analyst. Analyze the user-provided text (email body, SMS, chat message, or URL) for scam, phishing, or hacking indicators. Look for: impersonated brands, urgency/pressure tactics, credential requests, payment demands, suspicious sender domains, mismatched or shortened URLs, malware download links, romance/investment scams, tech-support scams, extortion. Return STRICT JSON only.',
+              'You are Trust Shield, a security analyst. Analyze the user-provided text (email body, SMS, chat message, or URL) for scam, phishing, or hacking indicators. Look for: impersonated brands, urgency/pressure tactics, credential requests, payment demands, suspicious sender domains, mismatched or shortened URLs, malware download links, romance/investment scams, tech-support scams, extortion. ALSO: even when the source is a legitimate, well-known website or message, still evaluate residual hacking / data-corruption risk (e.g. tracking, data harvesting, weak TLS, third-party redirects, permissive login flows, brand look-alike domains, links that could still lead to credential theft, files that could be tampered with). Return STRICT JSON only.',
           },
           {
             role: 'user',
             content:
               `Analyze the following for security threats and return JSON with this exact shape:\n` +
-              `{"is_threat":boolean,"threat_type":"phishing"|"scam"|"hack"|"suspicious_link"|"other","severity":"low"|"medium"|"high"|"critical","title":"short headline (max 70 chars)","summary":"one paragraph explanation for the user","indicators":["reason 1","reason 2"],"suspicious_urls":["url1"],"recommended_action":"what the user should do"}\n\n` +
+              `{"is_threat":boolean,"threat_type":"phishing"|"scam"|"hack"|"suspicious_link"|"other","severity":"low"|"medium"|"high"|"critical","title":"short headline (max 70 chars)","summary":"one paragraph explanation for the user","indicators":["reason 1","reason 2"],"suspicious_urls":["url1"],"recommended_action":"what the user should do","risk_score":0-100 integer overall risk of hack/corruption/data-loss even if legitimate,"risk_level":"safe"|"low"|"elevated"|"high","risk_warnings":["specific residual risks to warn the user about even if the source is legitimate"]}\n\n` +
               `Content to analyze:\n"""\n${content}\n"""`,
           },
         ],
