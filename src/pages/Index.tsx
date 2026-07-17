@@ -1085,7 +1085,14 @@ function ThreatRow({
                 <div>
                   <p className="font-semibold mb-1">Why it looks suspicious</p>
                   <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                    {threat.details.indicators.map((i, idx) => <li key={idx}>{i}</li>)}
+                    {threat.details.indicators.map((i: any, idx) => {
+                      const text = typeof i === 'string'
+                        ? i
+                        : i && typeof i === 'object'
+                          ? (i.reason || i.text || i.description || i.indicator || i.message || i.label || Object.values(i).filter(v => typeof v === 'string').join(' — ') || JSON.stringify(i))
+                          : String(i);
+                      return <li key={idx}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               )}
@@ -1093,7 +1100,14 @@ function ThreatRow({
                 <div>
                   <p className="font-semibold mb-1 flex items-center gap-1"><Link2 className="w-3 h-3" /> Suspicious links</p>
                   <ul className="space-y-0.5 text-destructive font-mono break-all">
-                    {threat.details.suspicious_urls.map((u, idx) => <li key={idx}>{u}</li>)}
+                    {threat.details.suspicious_urls.map((u: any, idx) => {
+                      const text = typeof u === 'string'
+                        ? u
+                        : u && typeof u === 'object'
+                          ? (u.url || u.href || u.link || JSON.stringify(u))
+                          : String(u);
+                      return <li key={idx}>{text}</li>;
+                    })}
                   </ul>
                 </div>
               )}
