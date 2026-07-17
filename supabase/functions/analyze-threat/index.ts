@@ -83,7 +83,8 @@ const SYSTEM_PROMPT =
 phishing, fake login pages, brand impersonation, tech-support scams, romance/pig-butchering scams, cryptocurrency scams, investment/pump-and-dump scams, fake shopping sites, fake shipping/USPS/UPS/DHL scams, IRS/government/tax scams, job/employment scams, gift-card scams, sextortion, malware droppers, credential theft, account-takeover attempts, and hacking indicators.
 Also assess residual risk even for legitimate sites (tracking, data harvesting, aggressive redirects, look-alike domains, weak TLS, suspicious download prompts).
 Use cautious, evidence-based language. Never invent identities, attackers, or countries.
-Every summary must consist of 2-4 complete sentences and end with a period.`;
+Every summary must consist of 2-4 complete sentences and end with a period.
+CRITICAL CONSISTENCY RULE: is_threat MUST be true whenever your summary, indicators, title, or recommended_action describe the content as malicious, phishing, a scam, fraudulent, credential-harvesting, spoofed, or otherwise dangerous — or whenever suspicious_urls is non-empty, severity is high/critical, or risk_score >= 60. Only set is_threat=false when the content is genuinely benign and no malicious indicators are present.`;
 
 const createGateway = (apiKey: string) =>
   createOpenAICompatible({
