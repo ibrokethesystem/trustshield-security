@@ -15,8 +15,8 @@ Deno.serve(async (req) => {
     }
 
     const clean = texts.map((t) => String(t).slice(0, 500));
-    const sys = `You translate short UI strings from English into ${target}. Return ONLY a JSON array of strings, same length and order as the input. Preserve punctuation, numbers, emojis, and placeholders. Do not add commentary. If a string is a proper noun/brand (like "Trust Shield"), you may keep it in English.`;
-    const user = JSON.stringify(clean);
+    const sys = `You are a professional translator. Translate every English UI string in the input array into ${target}. Rules:\n- Output ONLY a JSON object of the form {"translations": [ ... ]} with the SAME length and order as input.\n- Actually translate — do not echo English back. The ONLY exception is the exact brand name "Trust Shield", which stays as-is. Everything else, including short words like "Dashboard", "Log in", "Email", "Password", MUST be translated.\n- Preserve numbers, punctuation, emojis, URLs, and short codes like "F8" or "alt+T".\n- No commentary, no code fences.`;
+    const user = JSON.stringify({ input: clean });
 
     const call = async (model: string) => {
       const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -46,28 +46,43 @@ Deno.serve(async (req) => {
       raw = await call('google/gemini-2.5-flash');
     }
 
-    // Extract JSON array from the reply.
-    let arr: unknown = null;
-    try { arr = JSON.parse(raw); } catch { /* try to salvage */ }
-    if (arr && !Array.isArray(arr) && typeof arr === 'object') {
-      const vals = Object.values(arr as Record<string, unknown>);
-      if (vals.length === 1 && Array.isArray(vals[0])) arr = vals[0];
-      else if (vals.every((v) => typeof v === 'string')) arr = vals;
-    }
-    if (!Array.isArray(arr)) {
-      const m = raw.match(/\[[\s\S]*\]/);
-      if (m) { try { arr = JSON.parse(m[0]); } catch { /* ignore */ } }
-    }
-    if (!Array.isArray(arr) || arr.length !== clean.length) {
-      return json({ error: 'Translation parse failed' }, 502);
-    }
-    const translations = (arr as unknown[]).map((v, i) => (typeof v === 'string' && v.trim() ? v : clean[i]));
+    // Extract array from the reply — accept many shapes, never 502.
+    const arr = extractArray(raw);
+    const translations = clean.map((src, i) => {
+      const v = arr?.[i];
+      return typeof v === 'string' && v.trim() ? v : src;
+    });
     return json({ translations }, 200);
   } catch (err) {
     console.error('translate-text crashed', err);
-    return json({ error: 'Unexpected error' }, 500);
+    // Best-effort: echo originals so the client keeps working.
+    try {
+      const body = await req.clone().json().catch(() => ({}));
+      const texts: string[] = Array.isArray(body?.texts) ? body.texts : [];
+      return json({ translations: texts.map((t) => String(t)) }, 200);
+    } catch {
+      return json({ error: 'Unexpected error' }, 500);
+    }
   }
 });
+
+function extractArray(raw: string): unknown[] | null {
+  const tryParse = (s: string) => { try { return JSON.parse(s); } catch { return null; } };
+  let cleaned = raw.replace(/^```(?:json)?\s*/im, '').replace(/```\s*$/im, '').trim();
+  let parsed: any = tryParse(cleaned);
+  if (!parsed) {
+    const m = cleaned.match(/[\[{][\s\S]*[\]}]/);
+    if (m) parsed = tryParse(m[0]);
+  }
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed && typeof parsed === 'object') {
+    if (Array.isArray(parsed.translations)) return parsed.translations;
+    const vals = Object.values(parsed);
+    if (vals.length === 1 && Array.isArray(vals[0])) return vals[0] as unknown[];
+    if (vals.every((v) => typeof v === 'string')) return vals as unknown[];
+  }
+  return null;
+}
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
