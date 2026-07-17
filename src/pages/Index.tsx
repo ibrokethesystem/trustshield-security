@@ -29,6 +29,7 @@ import {
   Sparkles,
   Send,
   Gauge,
+  History,
 } from "lucide-react";
 import {
   LineChart,
@@ -71,8 +72,22 @@ type Threat = {
   created_at: string;
 };
 
-const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
+type ScanRecord = {
+  id: string;
+  verdict: string;
+  risk_score: number;
+  risk_level: string | null;
+  summary: string | null;
+  snippet: string | null;
+  had_image: boolean;
+  threat_id: string | null;
+  created_at: string;
+};
+
+type ViewKey = "dashboard" | "history";
+const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
+  { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "history", label: "Scan history", icon: History },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
@@ -106,6 +121,8 @@ const Index = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
+  const [view, setView] = useState<ViewKey>("dashboard");
+  const [history, setHistory] = useState<ScanRecord[] | null>(null);
 
   const submissionsKey = user ? `ts_submissions_${user.id}` : "";
   useEffect(() => {
@@ -139,6 +156,24 @@ const Index = () => {
   useEffect(() => {
     if (user) loadThreats();
   }, [user, loadThreats]);
+
+  const loadHistory = useCallback(async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("scan_history")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      toast.error("Couldn't load scan history", { description: error.message });
+      return;
+    }
+    setHistory((data ?? []) as ScanRecord[]);
+  }, [user]);
+
+  useEffect(() => {
+    if (user && view === "history") loadHistory();
+  }, [user, view, loadHistory]);
 
   const loadProfile = useCallback(async () => {
     if (!user) return;
@@ -286,15 +321,48 @@ const Index = () => {
         setSubmissions(next);
         localStorage.setItem(submissionsKey, String(next));
       }
+      const level = analysis.risk_level as string | undefined;
+      const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
+      const verdict = analysis.is_threat
+        ? "threat"
+        : level === "elevated" || level === "high" || score >= 40
+        ? "caution"
+        : "safe";
+      const snippet = content ? content.slice(0, 240) : null;
+      const { data: histRow } = await supabase
+        .from("scan_history")
+        .insert({
+          user_id: user!.id,
+          verdict,
+          risk_score: score,
+          risk_level: level ?? null,
+          summary: analysis.title || analysis.summary || null,
+          snippet,
+          had_image: !!scanImage,
+          threat_id: null,
+        })
+        .select("id")
+        .maybeSingle();
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
         setScanImage(null);
         await loadThreats();
+        if (histRow?.id) {
+          // best-effort link to the newest threat
+          const { data: latest } = await supabase
+            .from("threats")
+            .select("id")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (latest?.id) {
+            await supabase.from("scan_history").update({ threat_id: latest.id }).eq("id", histRow.id);
+          }
+        }
+        if (view === "history") loadHistory();
       } else {
-        const level = analysis.risk_level as string | undefined;
         const warnings: string[] = analysis.risk_warnings ?? [];
-        const score: number = typeof analysis.risk_score === "number" ? analysis.risk_score : 0;
         if ((level === "elevated" || level === "high" || score >= 40) && warnings.length > 0) {
           toast.warning("Legitimate — but proceed with caution", {
             description: `Risk ${score}/100. ${warnings.slice(0, 3).join(" ")}`,
@@ -311,6 +379,7 @@ const Index = () => {
           });
         }
         setScanImage(null);
+        if (view === "history") loadHistory();
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Scan failed";
@@ -402,9 +471,10 @@ const Index = () => {
           {navItems.map((item) => (
             <button
               key={item.label}
+              onClick={() => setView(item.key)}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
-                item.active
+                view === item.key
                   ? "bg-secondary text-foreground"
                   : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
               )}
