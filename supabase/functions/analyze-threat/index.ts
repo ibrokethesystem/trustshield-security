@@ -224,6 +224,37 @@ function createBasicAnalysis(content: string): Analysis {
 }
 
 function extractUrls(content: string): string[] {
+  return _extractUrls(content);
+}
+
+function salvageJson(text: string): any | null {
+  if (!text) return null;
+  let s = text.replace(/```json\s*/gi, '').replace(/```/g, '').trim();
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  s = s.slice(start, end + 1);
+  try {
+    const obj = JSON.parse(s);
+    return {
+      is_threat: !!obj.is_threat,
+      threat_type: String(obj.threat_type ?? 'other'),
+      severity: String(obj.severity ?? 'medium'),
+      title: String(obj.title ?? 'Scan result'),
+      summary: String(obj.summary ?? ''),
+      indicators: Array.isArray(obj.indicators) ? obj.indicators.map(String) : [],
+      suspicious_urls: Array.isArray(obj.suspicious_urls) ? obj.suspicious_urls.map(String) : [],
+      recommended_action: String(obj.recommended_action ?? ''),
+      risk_score: Number(obj.risk_score ?? 0),
+      risk_level: String(obj.risk_level ?? 'safe'),
+      risk_warnings: Array.isArray(obj.risk_warnings) ? obj.risk_warnings.map(String) : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function _extractUrls(content: string): string[] {
   const matches = content.match(/(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s"'<>]*)?/gi);
   return [...new Set(matches ?? [])];
 }
