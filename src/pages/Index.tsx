@@ -96,6 +96,8 @@ const Index = () => {
   const [threats, setThreats] = useState<Threat[] | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanText, setScanText] = useState("");
+  const [scanImage, setScanImage] = useState<{ dataUrl: string; name: string } | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [avatarPath, setAvatarPath] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -262,14 +264,18 @@ const Index = () => {
 
   const runScan = async () => {
     const content = scanText.trim();
-    if (!content) {
-      toast.error("Nothing to scan", { description: "Paste an email, message, or URL first." });
+    if (!content && !scanImage) {
+      toast.error("Nothing to scan", { description: "Paste text or attach a screenshot first." });
       return;
     }
     setScanning(true);
     try {
       const { data, error } = await supabase.functions.invoke("analyze-threat", {
-        body: { content, source: "manual_scan" },
+        body: {
+          content,
+          image: scanImage?.dataUrl ?? null,
+          source: scanImage ? "screenshot_scan" : "manual_scan",
+        },
       });
       if (error) throw error;
       const analysis = (data as any)?.analysis;
@@ -283,6 +289,7 @@ const Index = () => {
       if (analysis.is_threat) {
         toast.error("Threat detected", { description: analysis.title });
         setScanText("");
+        setScanImage(null);
         await loadThreats();
       } else {
         const level = analysis.risk_level as string | undefined;
