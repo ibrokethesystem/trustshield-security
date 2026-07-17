@@ -124,6 +124,29 @@ const Index = () => {
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [appInstalled, setAppInstalled] = useState(false);
+
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    const onInstalled = () => {
+      setAppInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    // Detect if already running as an installed app
+    if (window.matchMedia?.("(display-mode: standalone)").matches) {
+      setAppInstalled(true);
+    }
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
 
   const submissionsKey = user ? `ts_submissions_${user.id}` : "";
   useEffect(() => {
@@ -518,32 +541,40 @@ const Index = () => {
 
         <button
           onClick={async () => {
-            try {
-              const meta = await fetch("/TrustShield-mac-arm64.zip.asset.json").then((r) => r.json());
-              const res = await fetch(meta.url);
-              if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-              const blob = await res.blob();
-              const a = document.createElement("a");
-              a.href = URL.createObjectURL(blob);
-              a.download = "TrustShield-mac-arm64.zip";
-              a.click();
-              URL.revokeObjectURL(a.href);
-              toast.success("Mac app downloaded", {
-                description:
-                  "Unzip, then drag TrustShield.app to Applications. First launch: right-click → Open to bypass Gatekeeper.",
-                duration: 9000,
+            if (appInstalled) {
+              toast.success("Trust Shield is already installed", {
+                description: "Launch it from your Applications folder, Launchpad, or Dock.",
+                duration: 6000,
               });
-            } catch (err: any) {
-              toast.error(err?.message ?? "Download failed");
+              return;
             }
+            if (installPrompt) {
+              installPrompt.prompt();
+              const { outcome } = await installPrompt.userChoice;
+              if (outcome === "accepted") {
+                toast.success("Installing Trust Shield…", {
+                  description: "It will appear as a standalone app on your device.",
+                  duration: 6000,
+                });
+              }
+              setInstallPrompt(null);
+              return;
+            }
+            toast.info("One-click install unavailable in this browser", {
+              description:
+                "In Chrome/Edge on desktop: click the install icon in the address bar (or ⋮ → Install Trust Shield). On iPhone Safari: Share → Add to Home Screen.",
+              duration: 9000,
+            });
           }}
           className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
         >
           <Download className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">Install on Mac</span>
+          <span className="flex-1 text-left font-medium">
+            {appInstalled ? "App installed" : "Install app"}
+          </span>
         </button>
         <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Native macOS app (Apple Silicon).
+          One-click install — no unzipping. Works on Mac, Windows, Chromebook & Android via Chrome/Edge.
         </p>
 
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
