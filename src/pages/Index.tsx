@@ -534,6 +534,8 @@ const Index = () => {
           </div>
         </header>
 
+        {view === "dashboard" ? (
+          <>
         {/* Stat cards */}
         <div className="grid grid-cols-4 gap-4">
           <SecurityScoreCard score={securityScore} />
@@ -681,6 +683,23 @@ const Index = () => {
             </ul>
           )}
         </section>
+          </>
+        ) : (
+          <ScanHistoryView
+            history={history}
+            onRefresh={loadHistory}
+            onClear={async () => {
+              if (!user) return;
+              const { error } = await supabase.from("scan_history").delete().eq("user_id", user.id);
+              if (error) {
+                toast.error("Couldn't clear history", { description: error.message });
+                return;
+              }
+              setHistory([]);
+              toast.success("Scan history cleared");
+            }}
+          />
+        )}
 
         <footer className="text-xs text-muted-foreground pb-6">
           Trust Shield analyzes content you submit. It cannot access your device, messages, or accounts on its own.
