@@ -47,16 +47,32 @@ function pickEnum<T extends readonly string[]>(value: unknown, allowed: T, fallb
 
 function normalize(raw: z.infer<typeof AnalysisSchema>): Analysis {
   const score = Math.max(0, Math.min(100, Math.round(Number(raw.risk_score) || 0)));
+  const severity = pickEnum(raw.severity, SEVERITIES, 'medium');
+  const threat_type = pickEnum(raw.threat_type, THREAT_TYPES, 'other');
+  const indicators = (raw.indicators ?? []).map((s) => String(s));
+  const suspicious_urls = (raw.suspicious_urls ?? []).map((s) => String(s));
+  const summary = (raw.summary || '').slice(0, 1200);
+  const maliciousText = /malicious|phishing|scam|fraud|dangerous|do not click|credential (theft|harvest)|spoof/i.test(
+    `${raw.title ?? ''} ${summary} ${indicators.join(' ')}`,
+  );
+  const is_threat =
+    !!raw.is_threat ||
+    score >= 60 ||
+    severity === 'high' ||
+    severity === 'critical' ||
+    suspicious_urls.length > 0 ||
+    (threat_type !== 'other' && indicators.length > 0) ||
+    maliciousText;
   return {
-    is_threat: !!raw.is_threat,
-    threat_type: pickEnum(raw.threat_type, THREAT_TYPES, 'other'),
-    severity: pickEnum(raw.severity, SEVERITIES, 'medium'),
-    title: (raw.title || 'Scan result').slice(0, 90),
-    summary: (raw.summary || '').slice(0, 1200),
-    indicators: (raw.indicators ?? []).map((s) => String(s)),
-    suspicious_urls: (raw.suspicious_urls ?? []).map((s) => String(s)),
+    is_threat,
+    threat_type: is_threat && threat_type === 'other' ? (suspicious_urls.length > 0 ? 'suspicious_link' : 'scam') : threat_type,
+    severity: is_threat && severity === 'low' && score >= 60 ? 'medium' : severity,
+    title: (raw.title || (is_threat ? 'Potential threat detected' : 'Scan result')).slice(0, 90),
+    summary,
+    indicators,
+    suspicious_urls,
     recommended_action: (raw.recommended_action || '').slice(0, 700),
-    risk_score: score,
+    risk_score: is_threat ? Math.max(score, 60) : score,
     risk_level: pickEnum(raw.risk_level, RISK_LEVELS, score >= 70 ? 'high' : score >= 40 ? 'elevated' : score > 0 ? 'low' : 'safe'),
     risk_warnings: (raw.risk_warnings ?? []).map((s) => String(s)),
   };
@@ -67,7 +83,8 @@ const SYSTEM_PROMPT =
 phishing, fake login pages, brand impersonation, tech-support scams, romance/pig-butchering scams, cryptocurrency scams, investment/pump-and-dump scams, fake shopping sites, fake shipping/USPS/UPS/DHL scams, IRS/government/tax scams, job/employment scams, gift-card scams, sextortion, malware droppers, credential theft, account-takeover attempts, and hacking indicators.
 Also assess residual risk even for legitimate sites (tracking, data harvesting, aggressive redirects, look-alike domains, weak TLS, suspicious download prompts).
 Use cautious, evidence-based language. Never invent identities, attackers, or countries.
-Every summary must consist of 2-4 complete sentences and end with a period.`;
+Every summary must consist of 2-4 complete sentences and end with a period.
+CRITICAL CONSISTENCY RULE: is_threat MUST be true whenever your summary, indicators, title, or recommended_action describe the content as malicious, phishing, a scam, fraudulent, credential-harvesting, spoofed, or otherwise dangerous — or whenever suspicious_urls is non-empty, severity is high/critical, or risk_score >= 60. Only set is_threat=false when the content is genuinely benign and no malicious indicators are present.`;
 
 const createGateway = (apiKey: string) =>
   createOpenAICompatible({
