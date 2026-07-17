@@ -705,7 +705,37 @@ function ThreatRow({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [guardianOpen, setGuardianOpen] = useState(false);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
   const isActive = threat.status === "active";
+
+  const sendGuardian = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    const next = [...messages, { role: "user" as const, content: text }];
+    setMessages(next);
+    setInput("");
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("guardian-chat", {
+        body: { threat_id: threat.id, messages: next },
+      });
+      if (error) throw error;
+      const reply = (data as any)?.reply as string | undefined;
+      if (!reply) throw new Error("No reply");
+      setMessages((cur) => [...cur, { role: "assistant", content: reply }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Chat failed";
+      toast.error("Cyber Guardian error", { description: msg });
+      setMessages((cur) => cur.slice(0, -1));
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <li className={cn("bg-card border rounded-2xl p-4", isActive ? "border-border" : "border-border/50 opacity-60")}>
       <div className="flex items-start gap-3">
@@ -731,6 +761,13 @@ function ThreatRow({
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setOpen((v) => !v)} className="text-xs text-primary hover:underline">
               {open ? "Hide details" : "View details"}
+            </button>
+            <button
+              onClick={() => setGuardianOpen((v) => !v)}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              <Sparkles className="w-3 h-3" />
+              {guardianOpen ? "Close Cyber Guardian" : "Ask Cyber Guardian"}
             </button>
             {isActive && (
               <>
@@ -770,6 +807,65 @@ function ThreatRow({
                   <p className="text-muted-foreground">{threat.details.recommended_action}</p>
                 </div>
               )}
+            </div>
+          )}
+          {guardianOpen && (
+            <div className="mt-3 pt-3 border-t border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-6 h-6 rounded-md bg-primary/15 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <p className="text-xs font-semibold">Cyber Guardian</p>
+                <span className="text-[10px] text-muted-foreground">AI assistant for this threat</span>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {messages.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Ask anything about this alert — "Why is this dangerous?", "What if I already clicked?", "How do I check if my account is safe?"
+                  </p>
+                )}
+                {messages.map((m, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "text-xs rounded-lg px-3 py-2 whitespace-pre-wrap",
+                      m.role === "user"
+                        ? "bg-primary/10 text-foreground ml-8"
+                        : "bg-secondary/60 text-foreground mr-8"
+                    )}
+                  >
+                    {m.content}
+                  </div>
+                ))}
+                {sending && (
+                  <div className="bg-secondary/60 text-xs rounded-lg px-3 py-2 mr-8 inline-flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Thinking…
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendGuardian();
+                    }
+                  }}
+                  placeholder="Ask about this threat…"
+                  disabled={sending}
+                  className="h-8 text-xs"
+                />
+                <Button
+                  size="sm"
+                  onClick={sendGuardian}
+                  disabled={sending || !input.trim()}
+                  className="h-8 px-3 bg-gradient-shield hover:opacity-90"
+                >
+                  <Send className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
