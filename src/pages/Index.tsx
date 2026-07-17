@@ -576,7 +576,6 @@ const Index = () => {
         <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
           One-click install — no unzipping. Works on Mac, Windows, Chromebook & Android via Chrome/Edge.
         </p>
-
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
             onClick={() => setProfileOpen(true)}
