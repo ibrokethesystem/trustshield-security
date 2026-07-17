@@ -85,16 +85,10 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      // Try to extract JSON from markdown code fences or surrounding text
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (!match) {
-        console.error('Could not parse analysis, raw:', rawText);
-        return json({ error: 'Could not parse analysis' }, 502);
-      }
       try {
-        parsed = JSON.parse(match[0]);
+        parsed = extractJSON(rawText);
       } catch (e) {
-        console.error('Could not parse extracted JSON:', match[0], e);
+        console.error('Could not parse analysis, raw:', rawText, e);
         return json({ error: 'Could not parse analysis' }, 502);
       }
     }
@@ -139,4 +133,20 @@ function json(body: unknown, status: number) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+function extractJSON(raw: string): Analysis {
+  let cleaned = raw
+    .replace(/^\s*```(?:json)?\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim();
+
+  if (!cleaned.startsWith('{')) {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start === -1 || end <= start) throw new Error('No JSON object found');
+    cleaned = cleaned.slice(start, end + 1);
+  }
+
+  return JSON.parse(cleaned);
 }
