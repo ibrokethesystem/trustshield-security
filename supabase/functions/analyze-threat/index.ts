@@ -180,6 +180,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Apply shared URL heuristics (same rules as the Chrome extension) so any
+    // URL the extension would warn on also boosts Trust Shield's verdict.
+    if (content) parsed = applyHeuristics(parsed, content);
+
     // Only insert into DB if it's actually a threat
     let threatId: string | null = null;
     if (parsed.is_threat) {
