@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Eye, EyeOff, KeyRound, Lock, Plus, Trash2, ShieldCheck, ShieldAlert,
-  Fingerprint, Unlock, LockKeyhole, Cloud, Loader2,
+  Fingerprint, Unlock, LockKeyhole, Cloud, Loader2, Globe, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ type VaultEntry = {
   username: string;
   password: string;
   notes: string;
+  url: string;
   updated_at: string;
 };
 
@@ -236,7 +237,10 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
         try {
           const raw = localStorage.getItem(localVaultKey(undefined));
           const list: VaultEntry[] = raw ? JSON.parse(raw) : [];
-          if (!cancelled) { setEntries(list); updateSummary(list); }
+          if (!cancelled) {
+            const norm = list.map((e) => ({ ...e, url: e.url ?? "" }));
+            setEntries(norm); updateSummary(norm);
+          }
         } catch { if (!cancelled) setEntries([]); }
         setLoading(false);
         return;
@@ -264,7 +268,7 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
       ]);
       if (cancelled) return;
       const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
-        id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", updated_at: r.updated_at,
+        id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
       }));
       setEntries(list);
       updateSummary(list);
@@ -295,16 +299,16 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
     if (userId) {
       const { data, error } = await supabase
         .from("vault_entries")
-        .insert({ user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() })
+        .insert({ user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() } as any)
         .select()
         .single();
       if (error || !data) { toast.error("Couldn't save", { description: error?.message }); return; }
-      const entry: VaultEntry = { id: data.id, label: data.label, username: data.username ?? "", password: data.password, notes: data.notes ?? "", updated_at: data.updated_at };
+      const entry: VaultEntry = { id: data.id, label: data.label, username: data.username ?? "", password: data.password, notes: data.notes ?? "", url: (data as any).url ?? "", updated_at: data.updated_at };
       const next = [entry, ...entries];
       setEntries(next); updateSummary(next);
       toast.success("Saved and synced to your account");
     } else {
-      const entry: VaultEntry = { id: crypto.randomUUID(), label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), updated_at: new Date().toISOString() };
+      const entry: VaultEntry = { id: crypto.randomUUID(), label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), url: "", updated_at: new Date().toISOString() };
       const next = [entry, ...entries];
       setEntries(next); updateSummary(next);
       try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {}
@@ -326,6 +330,46 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
   const copy = async (text: string) => {
     try { await navigator.clipboard.writeText(text); toast.success("Copied"); }
     catch { toast.error("Couldn't copy"); }
+  };
+
+  // ===== Autofill =====
+  const [autofillEditId, setAutofillEditId] = useState<string | null>(null);
+  const [autofillUrl, setAutofillUrl] = useState("");
+
+  const openAutofill = (entry: VaultEntry) => {
+    setAutofillEditId(entry.id);
+    setAutofillUrl(entry.url || "");
+  };
+
+  const saveAutofill = async (id: string) => {
+    let normalized = autofillUrl.trim();
+    if (normalized && !/^https?:\/\//i.test(normalized)) normalized = "https://" + normalized;
+    if (normalized) {
+      try { new URL(normalized); } catch { toast.error("Enter a valid URL like https://example.com"); return; }
+    }
+    if (userId) {
+      const { error } = await supabase.from("vault_entries").update({ url: normalized } as any).eq("id", id).eq("user_id", userId);
+      if (error) { toast.error("Couldn't save", { description: error.message }); return; }
+    }
+    const next = entries.map((e) => e.id === id ? { ...e, url: normalized } : e);
+    setEntries(next);
+    if (!userId) { try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {} }
+    setAutofillEditId(null); setAutofillUrl("");
+    toast.success(normalized ? "Autofill set up" : "Autofill cleared", {
+      description: normalized ? "Install the Chrome or Edge extension and sync to autofill on this site." : undefined,
+    });
+  };
+
+  const copyAutofillPayload = async () => {
+    const items = entries
+      .filter((e) => e.url)
+      .map((e) => ({ url: e.url, username: e.username, password: e.password, label: e.label }));
+    if (items.length === 0) { toast.error("No entries have an autofill URL yet."); return; }
+    const payload = { v: 1, kind: "trust-shield-autofill", items, exported_at: new Date().toISOString() };
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload));
+      toast.success("Autofill data copied", { description: "Open the Trust Shield extension popup and paste it into 'Autofill sync'." });
+    } catch { toast.error("Couldn't copy"); }
   };
 
   // ===== Lock helpers =====
@@ -653,8 +697,14 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{e.label}</span>
                       <span className={cn("text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded", s.color, "text-background")}>{s.label}</span>
+                      {e.url && (
+                        <span className="text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary/15 text-primary">
+                          <Globe className="h-3 w-3" /> Autofill on
+                        </span>
+                      )}
                     </div>
                     {e.username && <div className="text-xs text-muted-foreground truncate">{e.username}</div>}
+                    {e.url && <div className="text-xs text-muted-foreground truncate">{e.url}</div>}
                     <div className="mt-1 flex items-center gap-2">
                       <code className="text-xs bg-muted/50 px-2 py-1 rounded font-mono truncate max-w-[24ch]">
                         {isShown ? e.password : "•".repeat(Math.min(e.password.length, 12))}
@@ -663,8 +713,29 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
                         {isShown ? "Hide" : "Show"}
                       </button>
                       <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => copy(e.password)}>Copy</button>
+                      <button className="text-xs text-primary hover:underline inline-flex items-center gap-1" onClick={() => openAutofill(e)}>
+                        <Globe className="h-3 w-3" /> {e.url ? "Edit autofill" : "Set up autofill"}
+                      </button>
                     </div>
                     {e.notes && <div className="text-xs text-muted-foreground mt-1">{e.notes}</div>}
+                    {autofillEditId === e.id && (
+                      <div className="mt-2 rounded-lg border border-primary/40 bg-card p-3 space-y-2">
+                        <Label className="text-xs">Website URL for autofill</Label>
+                        <Input
+                          value={autofillUrl}
+                          onChange={(ev) => setAutofillUrl(ev.target.value)}
+                          placeholder="https://example.com/login"
+                          autoComplete="off"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                          The Trust Shield Chrome / Edge extension will autofill this password when you visit a page on this URL's domain. Autofill only works after you install the extension and press "Sync autofill" in its popup.
+                        </p>
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="ghost" size="sm" onClick={() => { setAutofillEditId(null); setAutofillUrl(""); }}>Cancel</Button>
+                          <Button size="sm" onClick={() => saveAutofill(e.id)}>Save autofill</Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <Button size="icon" variant="ghost" onClick={() => remove(e.id)} aria-label="Delete">
                     <Trash2 className="h-4 w-4" />
@@ -673,6 +744,17 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
               );
             })}
           </ul>
+        )}
+
+        {entries.some((e) => e.url) && (
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{entries.filter((e) => e.url).length} autofill entries ready.</span> Copy the data, then paste it into the Trust Shield Chrome or Edge extension popup to enable autofill on those sites.
+            </div>
+            <Button size="sm" variant="outline" onClick={copyAutofillPayload} className="gap-2">
+              <Copy className="h-3.5 w-3.5" /> Copy autofill data for extension
+            </Button>
+          </div>
         )}
         </>
         )}
