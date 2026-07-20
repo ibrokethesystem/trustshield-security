@@ -154,6 +154,7 @@ const Index = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
+  const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [appInstalled, setAppInstalled] = useState(false);
