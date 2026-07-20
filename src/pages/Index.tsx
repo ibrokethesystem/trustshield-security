@@ -881,6 +881,8 @@ const Index = () => {
           <PasswordsView userId={user?.id} />
         ) : view === "files" ? (
           <FileScannerView userId={user?.id} />
+        ) : view === "radar" ? (
+          <ThreatRadarView userId={user?.id} />
         ) : view === "extensions" ? (
           <ExtensionsView
             onAskGuardian={(browser) => {
