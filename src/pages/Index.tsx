@@ -854,7 +854,7 @@ const Index = () => {
           )}
         </section>
           </>
-        ) : (
+        ) : view === "history" ? (
           <ScanHistoryView
             history={history}
             onRefresh={loadHistory}
@@ -869,6 +869,8 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
+        ) : (
+          <GuardianView threats={threats ?? []} />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
