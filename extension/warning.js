@@ -27,7 +27,13 @@ if (!reasons.length) {
 }
 
 document.getElementById("back").addEventListener("click", () => {
-  if (history.length > 1) history.back(); else chrome.tabs && chrome.tabs.getCurrent ? window.close() : (location.href = "about:blank");
+  // Ask the background to navigate this tab back to safety in one click.
+  chrome.runtime.sendMessage({ type: "go-back" }, () => {
+    // Fallback if messaging fails.
+    if (chrome.runtime.lastError) {
+      try { history.go(-1); } catch { location.href = "about:blank"; }
+    }
+  });
 });
 
 document.getElementById("allowOnce").addEventListener("click", async () => {

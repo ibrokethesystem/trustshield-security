@@ -195,6 +195,29 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
       sendResponse({ ok: true });
     }
+    if (msg?.type === "go-back") {
+      const tabId = _sender.tab?.id;
+      if (tabId != null) {
+        try {
+          // Walk back through history entries until we leave the warning page,
+          // or close the tab if there is nowhere safe to go.
+          const [{ result: canGoBack } = { result: false }] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => history.length > 1,
+          }).catch(() => [{ result: false }]);
+          if (canGoBack) {
+            await chrome.tabs.goBack(tabId).catch(async () => {
+              await chrome.tabs.update(tabId, { url: "about:blank" });
+            });
+          } else {
+            await chrome.tabs.update(tabId, { url: "about:blank" });
+          }
+        } catch {
+          try { await chrome.tabs.update(tabId, { url: "about:blank" }); } catch {}
+        }
+      }
+      sendResponse({ ok: true });
+    }
   })();
   return true;
 });
