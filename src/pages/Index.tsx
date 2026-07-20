@@ -1069,7 +1069,7 @@ function SecurityScoreCard({ score }: { score: number }) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
+  return <div className="bg-card border border-border rounded-2xl p-5 h-full">{children}</div>;
 }
 
 function ScanHistoryView({
