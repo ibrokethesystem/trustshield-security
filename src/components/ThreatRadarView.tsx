@@ -175,7 +175,7 @@ export default function ThreatRadarView({ userId }: { userId?: string }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 bg-card border border-border rounded-2xl p-5 h-full">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
           <Radar className="w-5 h-5 text-primary" />
