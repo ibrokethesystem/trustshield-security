@@ -1,0 +1,1 @@
+ALTER TABLE public.vault_entries ADD COLUMN IF NOT EXISTS url text NOT NULL DEFAULT '';

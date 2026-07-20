@@ -135,6 +135,7 @@ export type Database = {
           notes: string
           password: string
           updated_at: string
+          url: string
           user_id: string
           username: string
         }
@@ -145,6 +146,7 @@ export type Database = {
           notes?: string
           password: string
           updated_at?: string
+          url?: string
           user_id: string
           username?: string
         }
@@ -155,6 +157,7 @@ export type Database = {
           notes?: string
           password?: string
           updated_at?: string
+          url?: string
           user_id?: string
           username?: string
         }
