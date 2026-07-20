@@ -37,7 +37,6 @@ import {
   Copy,
   MessageSquare,
   KeyRound,
-  Radar,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -95,14 +94,13 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "radar";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
-  { key: "radar", label: "Threat Radar", icon: Radar },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
@@ -728,7 +726,8 @@ const Index = () => {
               </div>
             </Card>
 
-            {/* Scanner */}
+            {/* Scanner + Threat Radar */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             <Card>
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -820,6 +819,8 @@ const Index = () => {
                 </Button>
               </div>
             </Card>
+            <ThreatRadarView userId={user?.id} />
+            </div>
 
             {/* Threats list */}
             <section>
@@ -881,8 +882,6 @@ const Index = () => {
           <PasswordsView userId={user?.id} />
         ) : view === "files" ? (
           <FileScannerView userId={user?.id} />
-        ) : view === "radar" ? (
-          <ThreatRadarView userId={user?.id} />
         ) : view === "extensions" ? (
           <ExtensionsView
             onAskGuardian={(browser) => {
