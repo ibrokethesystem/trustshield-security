@@ -95,7 +95,7 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "radar";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
@@ -883,8 +883,6 @@ const Index = () => {
           <PasswordsView userId={user?.id} />
         ) : view === "files" ? (
           <FileScannerView userId={user?.id} />
-        ) : view === "radar" ? (
-          <ThreatRadarView userId={user?.id} />
         ) : view === "extensions" ? (
           <ExtensionsView
             onAskGuardian={(browser) => {
