@@ -871,7 +871,13 @@ const Index = () => {
         ) : view === "network" ? (
           <NetworkScanView />
         ) : view === "passwords" ? (
-          <PasswordsView userId={user?.id} />
+          <PasswordsView
+            userId={user?.id}
+            onAskGuardian={(browser) => {
+              setGuardianPrefill(`How can I activate my autofill on the ${browser} extension?`);
+              setView("guardian");
+            }}
+          />
         ) : view === "files" ? (
           <FileScannerView userId={user?.id} />
         ) : view === "extensions" ? (
