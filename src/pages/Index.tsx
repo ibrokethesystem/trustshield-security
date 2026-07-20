@@ -1044,9 +1044,142 @@ const Index = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
     </div>
   );
 };
+
+function ShareDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const shareUrl = typeof window !== "undefined" ? window.location.origin : "https://trustshield-security.lovable.app";
+  const videoUrl = typeof window !== "undefined"
+    ? `${window.location.origin}${trustShieldAd.url}`
+    : trustShieldAd.url;
+  const subject = "Check out Trust Shield — real-time scam & hack protection";
+  const body =
+    `I've been using Trust Shield to catch phishing, scam messages, and dangerous links before they hit me. ` +
+    `Watch the quick demo: ${videoUrl}\n\nTry it here: ${shareUrl}`;
+
+  const canNativeShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  const nativeShare = async () => {
+    try {
+      await navigator.share({ title: "Trust Shield", text: body, url: shareUrl });
+    } catch {
+      /* user cancelled */
+    }
+  };
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${body}`);
+      toast.success("Link + message copied");
+    } catch {
+      toast.error("Couldn't copy to clipboard");
+    }
+  };
+
+  const open_ = (href: string) => window.open(href, "_blank", "noopener,noreferrer");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-primary" /> Share Trust Shield
+          </DialogTitle>
+          <DialogDescription>
+            Send friends and family a quick video so they can see how Trust Shield protects them.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-xl overflow-hidden border border-border bg-black">
+          <video
+            src={trustShieldAd.url}
+            controls
+            playsInline
+            className="w-full aspect-video"
+          />
+        </div>
+
+        <div className="rounded-lg border border-border bg-secondary/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap">
+          {body}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {canNativeShare && (
+            <Button onClick={nativeShare} className="gap-2 col-span-2 bg-gradient-shield hover:opacity-90">
+              <Share2 className="w-4 h-4" /> Share via device…
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() =>
+              open_(
+                `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+              )
+            }
+          >
+            <Mail className="w-4 h-4" /> Gmail
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => open_(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)}
+          >
+            <Mail className="w-4 h-4" /> Email app
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => open_(`sms:?&body=${encodeURIComponent(body)}`)}
+          >
+            <MessageSquare className="w-4 h-4" /> Messages / SMS
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => open_(`https://wa.me/?text=${encodeURIComponent(body)}`)}
+          >
+            <MessageSquare className="w-4 h-4" /> WhatsApp
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() =>
+              open_(
+                `https://twitter.com/intent/tweet?text=${encodeURIComponent(body)}`,
+              )
+            }
+          >
+            <Send className="w-4 h-4" /> X / Twitter
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() =>
+              open_(
+                `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(body)}`,
+              )
+            }
+          >
+            <Users className="w-4 h-4" /> Facebook
+          </Button>
+          <Button variant="outline" className="gap-2 col-span-2" onClick={copyLink}>
+            <Copy className="w-4 h-4" /> Copy message + link
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function SecurityScoreCard({ score }: { score: number }) {
   // score summary card
