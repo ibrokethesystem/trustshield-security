@@ -727,7 +727,8 @@ const Index = () => {
               </div>
             </Card>
 
-            {/* Scanner */}
+            {/* Scanner + Threat Radar */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
             <Card>
               <div className="flex items-start justify-between mb-3">
                 <div>
@@ -819,6 +820,8 @@ const Index = () => {
                 </Button>
               </div>
             </Card>
+            <ThreatRadarView userId={user?.id} compact />
+            </div>
 
             {/* Threats list */}
             <section>
