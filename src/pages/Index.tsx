@@ -1583,3 +1583,174 @@ function GuardianView({ threats }: { threats: Threat[] }) {
     </div>
   );
 }
+
+function NetworkScanView() {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [https, setHttps] = useState<boolean>(typeof window !== "undefined" && window.location.protocol === "https:");
+  const [connInfo, setConnInfo] = useState<{ type?: string; effectiveType?: string; downlink?: number; rtt?: number } | null>(null);
+
+  useEffect(() => {
+    setHttps(window.location.protocol === "https:");
+    const nav: any = navigator;
+    const c = nav.connection || nav.mozConnection || nav.webkitConnection;
+    if (c) {
+      setConnInfo({ type: c.type, effectiveType: c.effectiveType, downlink: c.downlink, rtt: c.rtt });
+    }
+  }, []);
+
+  const runScan = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("scan-network", { body: {} });
+      if (error) throw error;
+      setResult(data);
+      const verdict = (data as any)?.verdict;
+      if (verdict === "unsafe") {
+        toast.error("Network flagged as unsafe", { description: "See details below.", duration: 8000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+      } else if (verdict === "caution") {
+        toast.warning("Proceed with caution", { description: "Some risk signals on your network.", duration: 8000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+      } else {
+        toast.success("Network looks safe", { description: "No malicious signals detected.", duration: 6000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Scan failed";
+      setError(msg);
+      toast.error("Network scan failed", { description: msg });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verdictStyles: Record<string, string> = {
+    safe: "bg-green-500/10 text-green-400 border-green-500/30",
+    caution: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+    unsafe: "bg-destructive/10 text-destructive border-destructive/30",
+  };
+  const verdictLabel: Record<string, string> = { safe: "Safe", caution: "Caution", unsafe: "Unsafe" };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <div>
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <Wifi className="w-5 h-5 text-primary" /> Network safety scan
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+              Checks your current internet path — your public IP's reputation, ISP, geolocation, and whether it's a known
+              VPN, proxy, or malicious host. Note: browsers can't see your Wi-Fi's SSID, encryption, or signal — this
+              scans the network you're going through, not the Wi-Fi radio itself.
+            </p>
+          </div>
+          <Button onClick={runScan} disabled={loading} className="bg-gradient-shield hover:opacity-90 glow-shield gap-2 shrink-0">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+            {loading ? "Scanning…" : "Scan network"}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
+          <MiniInfo label="Page transport" value={https ? "HTTPS ✓" : "HTTP (insecure)"} tone={https ? "good" : "bad"} />
+          {connInfo?.effectiveType && (
+            <MiniInfo label="Connection quality" value={connInfo.effectiveType.toUpperCase()} />
+          )}
+          {connInfo?.type && <MiniInfo label="Connection type" value={connInfo.type} />}
+          {connInfo?.downlink != null && <MiniInfo label="Downlink" value={`${connInfo.downlink} Mbps`} />}
+          {connInfo?.rtt != null && <MiniInfo label="Round-trip time" value={`${connInfo.rtt} ms`} />}
+        </div>
+      </Card>
+
+      {error && (
+        <Card>
+          <p className="text-sm text-destructive">{error}</p>
+        </Card>
+      )}
+
+      {result && (
+        <Card>
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div
+              className={cn(
+                "text-xs font-bold px-3 py-1.5 rounded-full border uppercase tracking-wider",
+                verdictStyles[result.verdict] ?? verdictStyles.safe,
+              )}
+            >
+              {verdictLabel[result.verdict] ?? result.verdict}
+            </div>
+            <p className="text-sm text-muted-foreground">Risk score {result.risk_score}/100</p>
+            {result.ip && <p className="text-sm font-mono text-muted-foreground">IP: {result.ip}</p>}
+          </div>
+
+          {result.reasons && result.reasons.length > 0 ? (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Signals</p>
+              <ul className="space-y-1.5">
+                {result.reasons.map((r: string, i: number) => (
+                  <li key={i} className="text-sm flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+                    <span>{r}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mb-4 flex items-center gap-2 text-sm text-green-400">
+              <CheckCircle2 className="w-4 h-4" />
+              No malicious or proxy/VPN signals found.
+            </div>
+          )}
+
+          {result.geo && (
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location & ISP</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                {result.geo.city && <MiniInfo label="City" value={result.geo.city} />}
+                {result.geo.region && <MiniInfo label="Region" value={result.geo.region} />}
+                {result.geo.country && <MiniInfo label="Country" value={result.geo.country} />}
+                {result.geo.org && <MiniInfo label="ISP / Org" value={result.geo.org} />}
+                {result.geo.asn && <MiniInfo label="ASN" value={result.geo.asn} />}
+              </div>
+            </div>
+          )}
+
+          {result.virustotal && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                VirusTotal reputation
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <MiniInfo label="Malicious" value={result.virustotal.malicious} tone={result.virustotal.malicious > 0 ? "bad" : undefined} />
+                <MiniInfo label="Suspicious" value={result.virustotal.suspicious} tone={result.virustotal.suspicious > 0 ? "warn" : undefined} />
+                <MiniInfo label="Harmless" value={result.virustotal.harmless} />
+                <MiniInfo label="Undetected" value={result.virustotal.undetected} />
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
+      <Card>
+        <h4 className="font-semibold text-sm mb-2">What this can't check</h4>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Browsers don't expose your Wi-Fi's name, password strength, WPA2/WPA3 encryption, or nearby devices — those
+          require a native OS-level scanner. For full Wi-Fi audits, use your router admin page (usually{" "}
+          <span className="font-mono">192.168.1.1</span>) and confirm: WPA3 or WPA2 with a strong password, firmware
+          up to date, remote admin disabled, and guest network isolated.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+function MiniInfo({ label, value, tone }: { label: string; value: React.ReactNode; tone?: "good" | "bad" | "warn" }) {
+  const toneClass =
+    tone === "good" ? "text-green-400" : tone === "bad" ? "text-destructive" : tone === "warn" ? "text-yellow-400" : "";
+  return (
+    <div className="bg-secondary/40 border border-border rounded-lg p-3">
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+      <p className={cn("text-sm font-medium mt-1 truncate", toneClass)}>{value}</p>
+    </div>
+  );
+}
