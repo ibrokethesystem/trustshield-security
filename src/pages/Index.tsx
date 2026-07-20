@@ -727,8 +727,8 @@ const Index = () => {
             </Card>
 
             {/* Scanner + Threat Radar */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <div className="h-full"><Card>
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -810,7 +810,7 @@ const Index = () => {
                   {scanning ? "Analyzing…" : "Scan now"}
                 </Button>
               </div>
-            </Card>
+            </Card></div>
             <ThreatRadarView userId={user?.id} />
             </div>
 
@@ -1069,7 +1069,7 @@ function SecurityScoreCard({ score }: { score: number }) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
+  return <div className="bg-card border border-border rounded-2xl p-5 h-full">{children}</div>;
 }
 
 function ScanHistoryView({
