@@ -625,6 +625,35 @@ const Index = () => {
           Warns you before loading dangerous URLs in Chrome.
         </p>
 
+        <button
+          onClick={() => {
+            fetch("/trust-shield-safari.zip")
+              .then((res) => {
+                if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+                return res.blob();
+              })
+              .then((blob) => {
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = "trust-shield-safari.zip";
+                a.click();
+                URL.revokeObjectURL(a.href);
+                toast.success("Safari extension downloaded", {
+                  description: "Unzip, then in Terminal run: xcrun safari-web-extension-converter <folder>. Open the generated Xcode project, press Cmd+R, then enable Trust Shield in Safari → Settings → Extensions. Full steps in README.txt.",
+                  duration: 12000,
+                });
+              })
+              .catch((err) => toast.error(err.message));
+          }}
+          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-primary/40 text-foreground hover:bg-secondary/60 transition"
+        >
+          <Download className="w-4 h-4" />
+          <span className="flex-1 text-left font-medium">Safari extension</span>
+        </button>
+        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
+          Same protection for Safari. Requires macOS + Xcode to install (one-command wrap).
+        </p>
+
         {!appInstalled && (
           <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center gap-2 mb-1">
