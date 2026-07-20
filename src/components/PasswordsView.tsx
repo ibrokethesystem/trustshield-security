@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 type VaultEntry = {
   id: string;
@@ -182,7 +185,7 @@ async function verifyFingerprintCredential(credentialIdB64: string): Promise<boo
   }
 }
 
-export default function PasswordsView({ userId }: { userId: string | undefined }) {
+export default function PasswordsView({ userId, onAskGuardian }: { userId: string | undefined; onAskGuardian?: (browser: "Chrome" | "Edge") => void }) {
   const [pw, setPw] = useState("");
   const [show, setShow] = useState(false);
   const strength = useMemo(() => analyzePassword(pw), [pw]);
