@@ -195,6 +195,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
       sendResponse({ ok: true });
     }
+    if (msg?.type === "go-back") {
+      const tabId = _sender.tab?.id;
+      if (tabId != null) {
+        try {
+          await chrome.tabs.goBack(tabId);
+        } catch {
+          try { await chrome.tabs.update(tabId, { url: "about:blank" }); } catch {}
+        }
+      }
+      sendResponse({ ok: true });
+    }
   })();
   return true;
 });
