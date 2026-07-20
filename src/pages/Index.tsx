@@ -921,6 +921,8 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
+        ) : view === "network" ? (
+          <NetworkScanView />
         ) : (
           <GuardianView threats={threats ?? []} />
         )}
