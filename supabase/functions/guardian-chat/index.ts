@@ -23,37 +23,71 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const threatId: string | undefined = body.threat_id;
+    const mode: string = typeof body.mode === 'string' ? body.mode : (threatId ? 'threat' : 'general');
     const messages: Msg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
-    if (!threatId) return json({ error: 'Missing threat_id' }, 400);
     if (messages.length === 0) return json({ error: 'Empty conversation' }, 400);
 
-    const { data: threat, error: tErr } = await supabase
-      .from('threats')
-      .select('title, description, threat_type, severity, source, details')
-      .eq('id', threatId)
-      .maybeSingle();
-    if (tErr || !threat) return json({ error: 'Threat not found' }, 404);
+    const stringify = (v: unknown): string => {
+      if (v == null) return '';
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      if (Array.isArray(v)) return v.map(stringify).filter(Boolean).join(' | ');
+      try { return JSON.stringify(v); } catch { return String(v); }
+    };
 
-    const details = threat.details ?? {};
-    const context = [
-      `Threat: ${threat.title}`,
-      `Type: ${threat.threat_type} | Severity: ${threat.severity}`,
-      threat.description ? `Summary: ${threat.description}` : '',
-      details.indicators?.length ? `Indicators: ${details.indicators.join(' | ')}` : '',
-      details.suspicious_urls?.length ? `Suspicious URLs: ${details.suspicious_urls.join(' , ')}` : '',
-      details.recommended_action ? `Recommended action: ${details.recommended_action}` : '',
-      details.original_snippet ? `Original snippet: ${String(details.original_snippet).slice(0, 800)}` : '',
-    ].filter(Boolean).join('\n');
+    let context = '';
+    if (mode === 'threat' && threatId) {
+      const { data: threat, error: tErr } = await supabase
+        .from('threats')
+        .select('title, description, threat_type, severity, source, details')
+        .eq('id', threatId)
+        .maybeSingle();
+      if (tErr || !threat) return json({ error: 'Threat not found' }, 404);
+      const details: any = threat.details ?? {};
+      context = [
+        `Threat: ${threat.title}`,
+        `Type: ${threat.threat_type} | Severity: ${threat.severity}`,
+        threat.description ? `Summary: ${threat.description}` : '',
+        details.indicators?.length ? `Indicators: ${stringify(details.indicators)}` : '',
+        details.suspicious_urls?.length ? `Suspicious URLs: ${stringify(details.suspicious_urls)}` : '',
+        details.recommended_action ? `Recommended action: ${stringify(details.recommended_action)}` : '',
+        details.original_snippet ? `Original snippet: ${String(details.original_snippet).slice(0, 800)}` : '',
+      ].filter(Boolean).join('\n');
+    } else {
+      // "all" or "general/emergency" — load the user's recent threats to give overview help.
+      const { data: list } = await supabase
+        .from('threats')
+        .select('title, threat_type, severity, status, description, created_at')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      const items = (list ?? []).map((t: any, i: number) =>
+        `${i + 1}. [${t.severity}/${t.status}] ${t.threat_type} — ${t.title}${t.description ? ' — ' + String(t.description).slice(0, 160) : ''}`,
+      );
+      const activeCount = (list ?? []).filter((t: any) => t.status === 'active').length;
+      context = items.length
+        ? `User's recent Trust Shield threats (${activeCount} still active):\n${items.join('\n')}`
+        : `The user currently has no threats logged in Trust Shield.`;
+    }
 
-    const systemPrompt = `You are Cyber Guardian, the friendly AI assistant inside Trust Shield. You help everyday users understand a specific detected threat.
+    const modeGuidance =
+      mode === 'emergency'
+        ? `The user is asking for EMERGENCY safety guidance. Give clear, prioritized, numbered steps for what to do RIGHT NOW to keep their computer, accounts, and identity safe (disconnect from Wi-Fi, change critical passwords from a clean device, enable 2FA, run a reputable antivirus scan, freeze credit if financial info leaked, contact banks, report to authorities where relevant). Keep it calm and actionable.`
+        : mode === 'all'
+        ? `The user wants an overview of ALL of their alerts. Summarize patterns (types, severity, what to prioritize), and suggest next actions. If they ask about a specific one, focus on that.`
+        : mode === 'general'
+        ? `The user is asking general online-safety questions. Answer helpfully and concretely.`
+        : `Answer ONLY about this single threat and general online-safety guidance.`;
+
+    const systemPrompt = `You are Cyber Guardian, the friendly AI assistant inside Trust Shield. You help everyday users stay safe online.
 Rules:
-- Answer ONLY about this threat and general online-safety guidance.
 - Explain in plain language. No jargon unless you define it in the same sentence.
 - Be honest about uncertainty. Do not invent attacker names, countries, or evidence.
 - Trust Shield is a web app; it cannot reach into the user's OS, email, or accounts. Do not promise device-level actions.
-- Keep replies 1-4 short paragraphs.
+- Keep replies focused, 1-5 short paragraphs or a short numbered list when giving steps.
 
-CONTEXT ABOUT THIS THREAT:
+${modeGuidance}
+
+CONTEXT:
 ${context}`;
 
     const chatMessages = [
