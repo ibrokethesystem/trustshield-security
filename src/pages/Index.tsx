@@ -799,14 +799,6 @@ const Index = () => {
                       }}
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setView("files")}
-                    className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary/60 bg-secondary/30 transition"
-                  >
-                    <FileScan className="w-3.5 h-3.5" />
-                    Scan files
-                  </button>
                   <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
                 </div>
                 <Button
