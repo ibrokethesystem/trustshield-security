@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, KeyRound, Lock, Plus, Trash2, ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  Eye, EyeOff, KeyRound, Lock, Plus, Trash2, ShieldCheck, ShieldAlert,
+  Fingerprint, Unlock, LockKeyhole, Cloud, Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 type VaultEntry = {
   id: string;
