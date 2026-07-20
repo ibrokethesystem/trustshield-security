@@ -32,6 +32,7 @@ import {
   History,
   Download,
   FileScan,
+  Puzzle,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -79,12 +80,13 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "network", label: "Network safety", icon: Wifi },
   { key: "history", label: "Scan history", icon: History },
+  { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
