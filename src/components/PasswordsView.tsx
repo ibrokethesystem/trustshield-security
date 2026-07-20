@@ -126,6 +126,7 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
         updated_at: new Date().toISOString(),
       };
       localStorage.setItem(`trust-shield:vault-summary:${userId ?? "anon"}`, JSON.stringify(summary));
+      localStorage.setItem(`trust-shield:vault-summary:current`, JSON.stringify(summary));
     } catch {}
   };
 
