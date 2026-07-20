@@ -623,6 +623,17 @@ const Index = () => {
         <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
           Warns you before loading dangerous URLs in Chrome.
         </p>
+        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
+          Not sure how to install it?{" "}
+          <button
+            type="button"
+            onClick={() => setView("guardian")}
+            className="underline text-primary hover:opacity-80"
+          >
+            Ask Cyber Guardian
+          </button>
+          .
+        </p>
 
         <button
           onClick={() => {
@@ -651,6 +662,17 @@ const Index = () => {
         </button>
         <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
           Warns you before loading dangerous URLs in Microsoft Edge.
+        </p>
+        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
+          Not sure how to install it?{" "}
+          <button
+            type="button"
+            onClick={() => setView("guardian")}
+            className="underline text-primary hover:opacity-80"
+          >
+            Ask Cyber Guardian
+          </button>
+          .
         </p>
 
         {!appInstalled && (
