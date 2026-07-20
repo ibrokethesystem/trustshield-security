@@ -624,6 +624,39 @@ const Index = () => {
           Warns you before loading dangerous URLs in Chrome.
         </p>
 
+        {!appInstalled && (
+          <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Download className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-semibold text-foreground">Install Trust Shield</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug mb-2">
+              {installPrompt
+                ? "Get the full app on your device for faster access and offline use."
+                : "Tap the install icon in your browser's address bar to add Trust Shield as an app."}
+            </p>
+            {installPrompt && (
+              <button
+                onClick={async () => {
+                  try {
+                    await installPrompt.prompt();
+                    const choice = await installPrompt.userChoice;
+                    if (choice?.outcome === "accepted") {
+                      toast.success("Installing Trust Shield…");
+                    }
+                    setInstallPrompt(null);
+                  } catch {
+                    /* noop */
+                  }
+                }}
+                className="w-full text-xs font-medium px-2.5 py-1.5 rounded-md bg-primary text-primary-foreground hover:opacity-90 transition"
+              >
+                Install app
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
             onClick={() => setProfileOpen(true)}
