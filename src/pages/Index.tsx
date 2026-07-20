@@ -1678,6 +1678,12 @@ function GuardianView({
           mode,
           threat_id: mode === "threat" ? selectedThreatId : undefined,
           messages: next,
+          vault_summary: (() => {
+            try {
+              const raw = localStorage.getItem(`trust-shield:vault-summary:${(window as any).__tsUserId ?? "anon"}`);
+              return raw ? JSON.parse(raw) : null;
+            } catch { return null; }
+          })(),
         },
       });
       if (error) throw error;
