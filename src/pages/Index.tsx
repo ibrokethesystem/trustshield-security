@@ -62,6 +62,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
 import PasswordsView from "@/components/PasswordsView";
+import FileScannerView from "@/components/FileScannerView";
 
 type Threat = {
   id: string;
@@ -92,11 +93,12 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
+  { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
