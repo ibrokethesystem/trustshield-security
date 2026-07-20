@@ -664,6 +664,52 @@ const Index = () => {
               <LogOut className="w-3 h-3" /> Sign out
             </button>
           </div>
+          <Popover
+            open={inboxOpen}
+            onOpenChange={(o) => {
+              setInboxOpen(o);
+              if (o) markInboxRead();
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="relative w-8 h-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center shrink-0 transition"
+                aria-label="Inbox"
+              >
+                <Inbox className="w-4 h-4" />
+                {unreadUpdates > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-card">
+                    {unreadUpdates}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-80 p-0">
+              <div className="p-3 border-b border-border">
+                <div className="text-sm font-semibold">Inbox</div>
+                <div className="text-[11px] text-muted-foreground">
+                  What's new in Trust Shield
+                </div>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                {UPDATES.map((u) => (
+                  <div key={u.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold">
+                        Update {u.version} — {u.name}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {u.date}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      {u.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </aside>
 
