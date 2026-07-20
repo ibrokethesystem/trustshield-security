@@ -32,6 +32,7 @@ import {
   History,
   Download,
   FileScan,
+  Puzzle,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -79,12 +80,13 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "network", label: "Network safety", icon: Wifi },
   { key: "history", label: "Scan history", icon: History },
+  { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
@@ -595,86 +597,6 @@ const Index = () => {
           ))}
         </nav>
 
-        <button
-          onClick={() => {
-            fetch("/trust-shield-extension.zip")
-              .then((res) => {
-                if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-                return res.blob();
-              })
-              .then((blob) => {
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "trust-shield-extension.zip";
-                a.click();
-                URL.revokeObjectURL(a.href);
-                toast.success("Chrome extension downloaded", {
-                  description: "Unzip it, open chrome://extensions, enable Developer mode, then click 'Load unpacked'.",
-                  duration: 9000,
-                });
-              })
-              .catch((err) => toast.error(err.message));
-          }}
-          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
-        >
-          <Download className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">Chrome extension</span>
-        </button>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Warns you before loading dangerous URLs in Chrome.
-        </p>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Not sure how to install it?{" "}
-          <button
-            type="button"
-            onClick={() => setView("guardian")}
-            className="underline text-primary hover:opacity-80"
-          >
-            Ask Cyber Guardian
-          </button>
-          .
-        </p>
-
-        <button
-          onClick={() => {
-            fetch("/trust-shield-edge.zip")
-              .then((res) => {
-                if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-                return res.blob();
-              })
-              .then((blob) => {
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "trust-shield-edge.zip";
-                a.click();
-                URL.revokeObjectURL(a.href);
-                toast.success("Edge extension downloaded", {
-                  description: "Unzip it, open edge://extensions, enable Developer mode, then click 'Load unpacked'.",
-                  duration: 9000,
-                });
-              })
-              .catch((err) => toast.error(err.message));
-          }}
-          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
-        >
-          <Download className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">Edge extension</span>
-        </button>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Warns you before loading dangerous URLs in Microsoft Edge.
-        </p>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Not sure how to install it?{" "}
-          <button
-            type="button"
-            onClick={() => setView("guardian")}
-            className="underline text-primary hover:opacity-80"
-          >
-            Ask Cyber Guardian
-          </button>
-          .
-        </p>
-
         {!appInstalled && (
           <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center gap-2 mb-1">
@@ -1007,6 +929,8 @@ const Index = () => {
           />
         ) : view === "network" ? (
           <NetworkScanView />
+        ) : view === "extensions" ? (
+          <ExtensionsView onAskGuardian={() => setView("guardian")} />
         ) : (
           <GuardianView threats={threats ?? []} />
         )}
@@ -1462,6 +1386,103 @@ function ThreatRow({
 }
 
 export default Index;
+
+function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
+  const downloadZip = (path: string, filename: string, browser: string, storeUrl: string) => {
+    fetch(path)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast.success(`${browser} extension downloaded`, {
+          description: `Unzip it, open ${storeUrl}, enable Developer mode, then click 'Load unpacked'.`,
+          duration: 9000,
+        });
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
+  const extensions = [
+    {
+      key: "chrome",
+      name: "Chrome extension",
+      description: "Warns you before loading dangerous URLs in Google Chrome.",
+      zip: "/trust-shield-extension.zip",
+      filename: "trust-shield-extension.zip",
+      browser: "Chrome",
+      storeUrl: "chrome://extensions",
+    },
+    {
+      key: "edge",
+      name: "Microsoft Edge extension",
+      description: "Warns you before loading dangerous URLs in Microsoft Edge.",
+      zip: "/trust-shield-edge.zip",
+      filename: "trust-shield-edge.zip",
+      browser: "Edge",
+      storeUrl: "edge://extensions",
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Puzzle className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">Extensions</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Download Trust Shield browser extensions to get warned before you load a dangerous URL.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {extensions.map((ext) => (
+          <Card key={ext.key}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                <Puzzle className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold">{ext.name}</h4>
+                <p className="text-xs text-muted-foreground mt-1">{ext.description}</p>
+                <button
+                  onClick={() => downloadZip(ext.zip, ext.filename, ext.browser, ext.storeUrl)}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="font-medium">Download</span>
+                </button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <p className="text-sm text-center text-muted-foreground">
+          Don't know how to install?{" "}
+          <button
+            type="button"
+            onClick={onAskGuardian}
+            className="underline text-primary hover:opacity-80 font-medium"
+          >
+            Ask Cyber Guardian!
+          </button>
+        </p>
+      </Card>
+    </div>
+  );
+}
 
 function GuardianView({ threats }: { threats: Threat[] }) {
   const activeThreats = threats.filter((t) => t.status === "active");
