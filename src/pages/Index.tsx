@@ -1501,7 +1501,7 @@ function ExtensionsView({
                 type="button"
                 className="underline text-primary hover:opacity-80 font-medium"
               >
-                choose extension
+                extension
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center">
