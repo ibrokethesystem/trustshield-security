@@ -737,6 +737,23 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
                           <Button variant="ghost" size="sm" onClick={() => { setAutofillEditId(null); setAutofillUrl(""); }}>Cancel</Button>
                           <Button size="sm" onClick={() => saveAutofill(e.id)}>Save autofill</Button>
                         </div>
+                        {onAskGuardian && (
+                          <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+                            Don't know how to set up autofill? Ask{" "}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button type="button" className="text-primary hover:underline font-medium">
+                                  Cyber Guardian
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start">
+                                <DropdownMenuItem onClick={() => onAskGuardian("Chrome")}>Chrome</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => onAskGuardian("Edge")}>Edge</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                            !
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
