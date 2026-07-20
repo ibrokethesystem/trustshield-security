@@ -182,10 +182,6 @@ export default function ThreatRadarView({ userId }: { userId?: string }) {
         </div>
         <div className="flex-1">
           <h2 className="text-2xl font-bold">Threat Radar</h2>
-          <p className="text-sm text-muted-foreground">
-            Watch domains and IPs. Trust Shield checks each one against URLhaus (abuse.ch) and VirusTotal and alerts you when
-            they show up in threat-intel feeds.
-          </p>
         </div>
         <Button
           variant="outline"
