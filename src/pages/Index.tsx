@@ -86,9 +86,10 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history";
+type ViewKey = "dashboard" | "history" | "guardian";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "history", label: "Scan history", icon: History },
 ];
 
@@ -853,7 +854,7 @@ const Index = () => {
           )}
         </section>
           </>
-        ) : (
+        ) : view === "history" ? (
           <ScanHistoryView
             history={history}
             onRefresh={loadHistory}
@@ -868,6 +869,8 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
+        ) : (
+          <GuardianView threats={threats ?? []} />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
@@ -1292,3 +1295,209 @@ function ThreatRow({
 }
 
 export default Index;
+
+function GuardianView({ threats }: { threats: Threat[] }) {
+  const activeThreats = threats.filter((t) => t.status === "active");
+  const [mode, setMode] = useState<"all" | "emergency" | "threat" | "general">(
+    activeThreats.length > 0 ? "all" : "general",
+  );
+  const [selectedThreatId, setSelectedThreatId] = useState<string | "">("");
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const suggestions =
+    mode === "emergency"
+      ? [
+          "I think I was just hacked — what do I do first?",
+          "My password may be leaked. Steps right now?",
+          "I clicked a phishing link. What now?",
+        ]
+      : mode === "all"
+      ? [
+          "Summarize all my alerts and what to fix first.",
+          "Which of my threats is the most dangerous?",
+          "What patterns do you see in my alerts?",
+        ]
+      : mode === "threat"
+      ? [
+          "Why is this dangerous?",
+          "What should I do about this specific alert?",
+          "Is my account compromised because of this?",
+        ]
+      : [
+          "How do I spot a phishing email?",
+          "How do I keep my computer safe day-to-day?",
+          "What is 2FA and how do I turn it on?",
+        ];
+
+  const send = async (override?: string) => {
+    const text = (override ?? input).trim();
+    if (!text || sending) return;
+    if (mode === "threat" && !selectedThreatId) {
+      toast.error("Pick an alert to discuss first.");
+      return;
+    }
+    const next = [...messages, { role: "user" as const, content: text }];
+    setMessages(next);
+    setInput("");
+    setSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("guardian-chat", {
+        body: {
+          mode,
+          threat_id: mode === "threat" ? selectedThreatId : undefined,
+          messages: next,
+        },
+      });
+      if (error) throw error;
+      const reply = (data as any)?.reply as string | undefined;
+      if (!reply) throw new Error("No reply");
+      setMessages((cur) => [...cur, { role: "assistant", content: reply }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Chat failed";
+      toast.error("Cyber Guardian error", { description: msg });
+      setMessages((cur) => cur.slice(0, -1));
+      setInput(text);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const modes: { key: typeof mode; label: string; desc: string }[] = [
+    { key: "all", label: "All alerts", desc: "Overview of every threat you've scanned" },
+    { key: "threat", label: "One alert", desc: "Deep-dive on a specific threat" },
+    { key: "emergency", label: "Emergency", desc: "Something bad is happening RIGHT NOW" },
+    { key: "general", label: "Stay safe", desc: "General online-safety advice" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold text-lg">Cyber Guardian</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Ask about all your alerts, dig into a specific one, or get emergency safety steps if something bad is happening right now.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+          {modes.map((m) => (
+            <button
+              key={m.key}
+              onClick={() => {
+                setMode(m.key);
+                setMessages([]);
+              }}
+              className={cn(
+                "text-left p-3 rounded-xl border transition",
+                mode === m.key
+                  ? "border-primary/60 bg-primary/10"
+                  : "border-border bg-secondary/30 hover:bg-secondary/60",
+              )}
+            >
+              <p className="text-sm font-semibold">{m.label}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{m.desc}</p>
+            </button>
+          ))}
+        </div>
+        {mode === "threat" && (
+          <div className="mt-3">
+            <Label className="text-xs">Pick an alert</Label>
+            <select
+              value={selectedThreatId}
+              onChange={(e) => setSelectedThreatId(e.target.value)}
+              className="mt-1 w-full bg-secondary/50 border border-border rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">— select a threat —</option>
+              {threats.map((t) => (
+                <option key={t.id} value={t.id}>
+                  [{t.severity}] {t.title}
+                </option>
+              ))}
+            </select>
+            {threats.length === 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                You have no threats yet. Scan something on the dashboard first.
+              </p>
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div className="space-y-3 min-h-[280px] max-h-[520px] overflow-y-auto pr-1">
+          {messages.length === 0 ? (
+            <div>
+              <p className="text-xs text-muted-foreground mb-3">Try one of these:</p>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="text-xs px-3 py-1.5 rounded-full border border-border bg-secondary/40 hover:bg-secondary/70"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            messages.map((m, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "text-sm rounded-lg px-3 py-2 whitespace-pre-wrap",
+                  m.role === "user"
+                    ? "bg-primary/10 text-foreground ml-10"
+                    : "bg-secondary/60 text-foreground mr-10",
+                )}
+              >
+                {m.content}
+              </div>
+            ))
+          )}
+          {sending && (
+            <div className="bg-secondary/60 text-xs rounded-lg px-3 py-2 mr-10 inline-flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" /> Thinking…
+            </div>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
+            placeholder={
+              mode === "emergency"
+                ? "Describe what just happened…"
+                : mode === "threat"
+                ? "Ask about the selected alert…"
+                : mode === "all"
+                ? "Ask about your alerts…"
+                : "Ask a safety question…"
+            }
+            disabled={sending}
+            className="h-10"
+          />
+          <Button
+            onClick={() => send()}
+            disabled={sending || !input.trim()}
+            className="h-10 px-4 bg-gradient-shield hover:opacity-90"
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
