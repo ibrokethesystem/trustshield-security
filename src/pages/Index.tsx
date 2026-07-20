@@ -64,6 +64,44 @@ import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+
+type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
+
+const UPDATES: UpdateNote[] = [
+  {
+    id: "1.9.5",
+    version: "1.9.5",
+    name: "Inbox & release notes",
+    date: "2026-07-20",
+    summary:
+      "Added an inbox next to your profile so you'll always see what's new in Trust Shield. A red badge appears when a fresh update ships.",
+  },
+  {
+    id: "1.9.4",
+    version: "1.9.4",
+    name: "Autofill for Chrome & Edge",
+    date: "2026-07-15",
+    summary:
+      "Password vault entries can now sync a URL to the Chrome and Edge extensions and autofill logins with one click.",
+  },
+  {
+    id: "1.9.3",
+    version: "1.9.3",
+    name: "Threat Radar",
+    date: "2026-07-10",
+    summary:
+      "Watch a list of domains and IPs and get toast alerts when they show up in URLhaus or VirusTotal threat feeds.",
+  },
+  {
+    id: "1.9.2",
+    version: "1.9.2",
+    name: "File Scanner tab",
+    date: "2026-07-05",
+    summary:
+      "File scanning moved into its own sidebar tab with batch uploads, SHA-256 hashing, and VirusTotal analytics.",
+  },
+];
 
 type Threat = {
   id: string;
@@ -175,6 +213,22 @@ const Index = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("ts_last_read_update") ?? null;
+  });
+  const unreadUpdates = (() => {
+    if (!lastReadUpdateId) return UPDATES.length;
+    const idx = UPDATES.findIndex((u) => u.id === lastReadUpdateId);
+    return idx < 0 ? UPDATES.length : idx;
+  })();
+  const markInboxRead = () => {
+    const latest = UPDATES[0]?.id;
+    if (!latest) return;
+    localStorage.setItem("ts_last_read_update", latest);
+    setLastReadUpdateId(latest);
+  };
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -610,6 +664,52 @@ const Index = () => {
               <LogOut className="w-3 h-3" /> Sign out
             </button>
           </div>
+          <Popover
+            open={inboxOpen}
+            onOpenChange={(o) => {
+              setInboxOpen(o);
+              if (o) markInboxRead();
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="relative w-8 h-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center shrink-0 transition"
+                aria-label="Inbox"
+              >
+                <Inbox className="w-4 h-4" />
+                {unreadUpdates > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-card">
+                    {unreadUpdates}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-80 p-0">
+              <div className="p-3 border-b border-border">
+                <div className="text-sm font-semibold">Inbox</div>
+                <div className="text-[11px] text-muted-foreground">
+                  What's new in Trust Shield
+                </div>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-border">
+                {UPDATES.map((u) => (
+                  <div key={u.id} className="p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold">
+                        Update {u.version} — {u.name}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {u.date}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                      {u.summary}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </aside>
 
