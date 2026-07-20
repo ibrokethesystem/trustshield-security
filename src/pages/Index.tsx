@@ -678,17 +678,12 @@ const Index = () => {
 
             {/* Trend chart */}
             <Card>
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" /> Threats over the last 14 days
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Every confirmed threat you've scanned, grouped by day.
-                  </p>
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" /> Threats over the last 14 days
+                </h3>
               </div>
-              <div className="h-[180px] w-full">
+              <div className="h-[120px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
                     <XAxis
