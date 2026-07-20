@@ -14,6 +14,14 @@
     }
   },
   "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["autofill.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
   "web_accessible_resources": [
     { "resources": ["warning.html"], "matches": ["<all_urls>"] }
   ],
