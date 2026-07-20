@@ -861,31 +861,14 @@ const Index = () => {
                       }}
                     />
                   </label>
-                  <label
-                    className={cn(
-                      "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
-                      fileScanning || scanning
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-secondary/60 bg-secondary/30",
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => setView("files")}
+                    className="inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border hover:bg-secondary/60 bg-secondary/30 transition"
                   >
-                    {fileScanning ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <FileScan className="w-3.5 h-3.5" />
-                    )}
-                    {fileScanning ? "Scanning file…" : "Scan a file"}
-                    <input
-                      type="file"
-                      className="hidden"
-                      disabled={fileScanning || scanning}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleFileScan(f);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
+                    <FileScan className="w-3.5 h-3.5" />
+                    Scan files
+                  </button>
                   <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
                 </div>
                 <Button
