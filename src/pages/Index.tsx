@@ -1057,10 +1057,8 @@ function ShareDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const shareUrl = typeof window !== "undefined" ? window.location.origin : "https://trustshield-security.lovable.app";
-  const videoUrl = typeof window !== "undefined"
-    ? `${window.location.origin}${trustShieldAd.url}`
-    : trustShieldAd.url;
+  const shareUrl = "https://trustshield-security.lovable.app/";
+  const videoUrl = "file:///Users/ardabayram/Downloads/trust-shield-ad.mp4";
   const subject = "Check out Trust Shield — real-time scam & hack protection";
   const body =
     `I've been using Trust Shield to catch phishing, scam messages, and dangerous links before they hit me. ` +
