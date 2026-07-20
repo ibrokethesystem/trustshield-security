@@ -32,6 +32,7 @@ import {
   History,
   Download,
   FileScan,
+  RefreshCw,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
