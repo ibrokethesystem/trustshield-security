@@ -678,12 +678,17 @@ const Index = () => {
 
             {/* Trend chart */}
             <Card>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-primary" /> Threats over the last 14 days
-                </h3>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" /> Threats over the last 14 days
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Every confirmed threat you've scanned, grouped by day.
+                  </p>
+                </div>
               </div>
-              <div className="h-[120px] w-full">
+              <div className="h-[180px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
                     <XAxis
@@ -722,8 +727,8 @@ const Index = () => {
             </Card>
 
             {/* Scanner + Threat Radar */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-            <div className="h-full"><Card>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <Card>
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -739,7 +744,7 @@ const Index = () => {
                 value={scanText}
                 onChange={(e) => setScanText(e.target.value)}
                 placeholder="Paste suspicious email content, a text message, a URL — or attach a screenshot below…"
-                className="min-h-[200px] bg-secondary/50 border-border resize-none"
+                className="min-h-[120px] bg-secondary/50 border-border resize-none"
                 maxLength={8000}
                 disabled={scanning}
               />
@@ -805,7 +810,7 @@ const Index = () => {
                   {scanning ? "Analyzing…" : "Scan now"}
                 </Button>
               </div>
-            </Card></div>
+            </Card>
             <ThreatRadarView userId={user?.id} />
             </div>
 
@@ -1064,7 +1069,7 @@ function SecurityScoreCard({ score }: { score: number }) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-card border border-border rounded-2xl p-5 h-full">{children}</div>;
+  return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
 }
 
 function ScanHistoryView({
