@@ -112,8 +112,32 @@ function isWebAuthnSupported() {
   return typeof window !== "undefined" && "PublicKeyCredential" in window;
 }
 
+// Detects when this document (typically an embedded preview iframe) has been
+// denied the `publickey-credentials-create` / `-get` Permissions Policy.
+function webAuthnPermissionBlocked(kind: "create" | "get"): boolean {
+  try {
+    const feature = kind === "create" ? "publickey-credentials-create" : "publickey-credentials-get";
+    // Modern API
+    // @ts-ignore - permissionsPolicy is not in lib.dom yet
+    const pp = document.permissionsPolicy || document.featurePolicy;
+    if (pp && typeof pp.allowsFeature === "function") {
+      return !pp.allowsFeature(feature);
+    }
+  } catch {}
+  return false;
+}
+
+function isTopWindow() {
+  try { return window.top === window.self; } catch { return false; }
+}
+
 async function registerFingerprintCredential(userId: string, userLabel: string): Promise<string> {
   if (!isWebAuthnSupported()) throw new Error("Fingerprint / biometric not supported on this device");
+  if (webAuthnPermissionBlocked("create")) {
+    throw new Error(
+      "This preview frame blocks fingerprint enrollment. Open Trust Shield in its own tab (use the ⧉ button in the preview, or your published URL) and try again."
+    );
+  }
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const userIdBytes = new TextEncoder().encode(userId);
   const cred = (await navigator.credentials.create({
@@ -134,6 +158,12 @@ async function registerFingerprintCredential(userId: string, userLabel: string):
 
 async function verifyFingerprintCredential(credentialIdB64: string): Promise<boolean> {
   if (!isWebAuthnSupported()) return false;
+  if (webAuthnPermissionBlocked("get")) {
+    toast.error("Fingerprint unlock blocked in preview", {
+      description: "Open Trust Shield in its own tab to use fingerprint unlock.",
+    });
+    return false;
+  }
   const raw = Uint8Array.from(atob(credentialIdB64), (c) => c.charCodeAt(0));
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   try {
