@@ -32,6 +32,7 @@ import {
   History,
   Download,
   FileScan,
+  RefreshCw,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -656,6 +657,43 @@ const Index = () => {
             )}
           </div>
         )}
+
+        <button
+          onClick={async () => {
+            const tid = toast.loading("Checking for updates…");
+            try {
+              if ("serviceWorker" in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map((r) => r.update()));
+              }
+              const res = await fetch(window.location.href, { cache: "no-store" });
+              const html = await res.text();
+              const match = html.match(/\/assets\/index-[^"']+\.js/);
+              const currentScripts = Array.from(document.querySelectorAll("script[src]"))
+                .map((s) => (s as HTMLScriptElement).src);
+              const hasNew = match ? !currentScripts.some((s) => s.includes(match[0])) : false;
+              toast.dismiss(tid);
+              if (hasNew) {
+                toast.success("Update available", {
+                  description: "Reloading to apply the latest version…",
+                  duration: 3000,
+                });
+                setTimeout(() => window.location.reload(), 1200);
+              } else {
+                toast.success("You're up to date", {
+                  description: "Trust Shield is running the latest version.",
+                });
+              }
+            } catch {
+              toast.dismiss(tid);
+              toast.error("Could not check for updates");
+            }
+          }}
+          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-secondary text-foreground hover:bg-secondary/80 border border-border transition"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span className="flex-1 text-left font-medium">Check for updates</span>
+        </button>
 
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
