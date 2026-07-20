@@ -174,7 +174,6 @@ const Index = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
-  const [fileScanning, setFileScanning] = useState(false);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
