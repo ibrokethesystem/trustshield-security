@@ -213,6 +213,22 @@ const Index = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("ts_last_read_update") ?? null;
+  });
+  const unreadUpdates = (() => {
+    if (!lastReadUpdateId) return UPDATES.length;
+    const idx = UPDATES.findIndex((u) => u.id === lastReadUpdateId);
+    return idx < 0 ? UPDATES.length : idx;
+  })();
+  const markInboxRead = () => {
+    const latest = UPDATES[0]?.id;
+    if (!latest) return;
+    localStorage.setItem("ts_last_read_update", latest);
+    setLastReadUpdateId(latest);
+  };
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
