@@ -38,6 +38,12 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReToolti
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -154,6 +160,7 @@ const Index = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
+  const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [appInstalled, setAppInstalled] = useState(false);
@@ -930,9 +937,22 @@ const Index = () => {
         ) : view === "network" ? (
           <NetworkScanView />
         ) : view === "extensions" ? (
-          <ExtensionsView onAskGuardian={() => setView("guardian")} />
+          <ExtensionsView
+            onAskGuardian={(browser) => {
+              if (browser) {
+                setGuardianPrefill(
+                  `How can I install the Trust Shield ${browser} extension?`,
+                );
+              }
+              setView("guardian");
+            }}
+          />
         ) : (
-          <GuardianView threats={threats ?? []} />
+          <GuardianView
+            threats={threats ?? []}
+            prefill={guardianPrefill}
+            onPrefillConsumed={() => setGuardianPrefill("")}
+          />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
@@ -1387,7 +1407,11 @@ function ThreatRow({
 
 export default Index;
 
-function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
+function ExtensionsView({
+  onAskGuardian,
+}: {
+  onAskGuardian: (browser?: "Chrome" | "Edge") => void;
+}) {
   const downloadZip = (path: string, filename: string, browser: string, storeUrl: string) => {
     fetch(path)
       .then((res) => {
@@ -1470,10 +1494,29 @@ function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
 
       <Card>
         <p className="text-sm text-center text-muted-foreground">
-          Don't know how to install?{" "}
+          Don't know how to install the{" "}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="underline text-primary hover:opacity-80 font-medium"
+              >
+                choose extension
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem onClick={() => onAskGuardian("Chrome")}>
+                Chrome
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAskGuardian("Edge")}>
+                Edge
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          ? {" "}
           <button
             type="button"
-            onClick={onAskGuardian}
+            onClick={() => onAskGuardian()}
             className="underline text-primary hover:opacity-80 font-medium"
           >
             Ask Cyber Guardian!
@@ -1484,7 +1527,15 @@ function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
   );
 }
 
-function GuardianView({ threats }: { threats: Threat[] }) {
+function GuardianView({
+  threats,
+  prefill,
+  onPrefillConsumed,
+}: {
+  threats: Threat[];
+  prefill?: string;
+  onPrefillConsumed?: () => void;
+}) {
   const activeThreats = threats.filter((t) => t.status === "active");
   const [mode, setMode] = useState<"all" | "emergency" | "threat" | "general">(
     activeThreats.length > 0 ? "all" : "general",
@@ -1493,6 +1544,13 @@ function GuardianView({ threats }: { threats: Threat[] }) {
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (prefill) {
+      setInput(prefill);
+      onPrefillConsumed?.();
+    }
+  }, [prefill, onPrefillConsumed]);
 
   const suggestions =
     mode === "emergency"
