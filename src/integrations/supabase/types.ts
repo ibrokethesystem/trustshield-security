@@ -187,6 +187,51 @@ export type Database = {
         }
         Relationships: []
       }
+      watchlist: {
+        Row: {
+          created_at: string
+          detections: number
+          id: string
+          label: string
+          last_checked_at: string | null
+          notes: string
+          sources: Json
+          status: Database["public"]["Enums"]["watchlist_status"]
+          target: string
+          target_type: Database["public"]["Enums"]["watchlist_target_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detections?: number
+          id?: string
+          label?: string
+          last_checked_at?: string | null
+          notes?: string
+          sources?: Json
+          status?: Database["public"]["Enums"]["watchlist_status"]
+          target: string
+          target_type: Database["public"]["Enums"]["watchlist_target_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detections?: number
+          id?: string
+          label?: string
+          last_checked_at?: string | null
+          notes?: string
+          sources?: Json
+          status?: Database["public"]["Enums"]["watchlist_status"]
+          target?: string
+          target_type?: Database["public"]["Enums"]["watchlist_target_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -198,6 +243,13 @@ export type Database = {
       threat_severity: "low" | "medium" | "high" | "critical"
       threat_status: "active" | "dismissed" | "blocked"
       threat_type: "phishing" | "scam" | "hack" | "suspicious_link" | "other"
+      watchlist_status:
+        | "pending"
+        | "clean"
+        | "suspicious"
+        | "malicious"
+        | "error"
+      watchlist_target_type: "domain" | "ip"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -328,6 +380,14 @@ export const Constants = {
       threat_severity: ["low", "medium", "high", "critical"],
       threat_status: ["active", "dismissed", "blocked"],
       threat_type: ["phishing", "scam", "hack", "suspicious_link", "other"],
+      watchlist_status: [
+        "pending",
+        "clean",
+        "suspicious",
+        "malicious",
+        "error",
+      ],
+      watchlist_target_type: ["domain", "ip"],
     },
   },
 } as const
