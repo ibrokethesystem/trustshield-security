@@ -127,6 +127,66 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_entries: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          notes: string
+          password: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          notes?: string
+          password: string
+          updated_at?: string
+          user_id: string
+          username?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          notes?: string
+          password?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      vault_settings: {
+        Row: {
+          created_at: string
+          lock_enabled: boolean
+          pin_hash: string | null
+          pin_salt: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          lock_enabled?: boolean
+          pin_hash?: string | null
+          pin_salt?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          lock_enabled?: boolean
+          pin_hash?: string | null
+          pin_salt?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
