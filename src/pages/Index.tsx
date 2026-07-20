@@ -86,12 +86,41 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian";
+type ViewKey = "dashboard" | "history" | "guardian" | "malware";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "history", label: "Scan history", icon: History },
+  { key: "malware", label: "Malware detectors", icon: ShieldCheck },
 ];
+
+function MalwareDetectorsView() {
+  return (
+    <section className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+          <ShieldCheck className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-semibold">Malware detectors</h2>
+          <p className="text-sm text-muted-foreground">
+            Download trusted malware detection tools for your device.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/40 p-12 text-center">
+        <div className="w-14 h-14 mx-auto rounded-full bg-muted/40 flex items-center justify-center mb-4">
+          <Download className="w-6 h-6 text-muted-foreground" />
+        </div>
+        <h3 className="text-lg font-medium mb-1">Nothing here yet</h3>
+        <p className="text-sm text-muted-foreground">
+          Malware detector downloads will appear in this section soon.
+        </p>
+      </div>
+    </section>
+  );
+}
 
 const severityStyles: Record<Threat["severity"], string> = {
   low: "bg-blue-500/10 text-blue-400 border-blue-500/30",
@@ -869,8 +898,10 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
-        ) : (
+        ) : view === "guardian" ? (
           <GuardianView threats={threats ?? []} />
+        ) : (
+          <MalwareDetectorsView />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
