@@ -929,6 +929,8 @@ const Index = () => {
           />
         ) : view === "network" ? (
           <NetworkScanView />
+        ) : view === "extensions" ? (
+          <ExtensionsView onAskGuardian={() => setView("guardian")} />
         ) : (
           <GuardianView threats={threats ?? []} />
         )}
