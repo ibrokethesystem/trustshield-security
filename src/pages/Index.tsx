@@ -953,6 +953,8 @@ const Index = () => {
           />
         ) : view === "network" ? (
           <NetworkScanView />
+        ) : view === "passwords" ? (
+          <PasswordsView userId={user?.id} />
         ) : view === "extensions" ? (
           <ExtensionsView
             onAskGuardian={(browser) => {
