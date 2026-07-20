@@ -1132,7 +1132,7 @@ function ShareDialog({
           <Button
             variant="outline"
             className="gap-2"
-            onClick={() => open_("https://mail.google.com/")}
+            onClick={() => open_("https://mail.google.com/mail/u/0/#inbox")}
           >
             <Mail className="w-4 h-4" /> Open Gmail
           </Button>
