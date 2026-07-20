@@ -1527,7 +1527,15 @@ function ExtensionsView({
   );
 }
 
-function GuardianView({ threats }: { threats: Threat[] }) {
+function GuardianView({
+  threats,
+  prefill,
+  onPrefillConsumed,
+}: {
+  threats: Threat[];
+  prefill?: string;
+  onPrefillConsumed?: () => void;
+}) {
   const activeThreats = threats.filter((t) => t.status === "active");
   const [mode, setMode] = useState<"all" | "emergency" | "threat" | "general">(
     activeThreats.length > 0 ? "all" : "general",
@@ -1536,6 +1544,13 @@ function GuardianView({ threats }: { threats: Threat[] }) {
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (prefill) {
+      setInput(prefill);
+      onPrefillConsumed?.();
+    }
+  }, [prefill, onPrefillConsumed]);
 
   const suggestions =
     mode === "emergency"
