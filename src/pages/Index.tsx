@@ -102,7 +102,6 @@ const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
-  { key: "radar", label: "Threat Radar", icon: Radar },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
