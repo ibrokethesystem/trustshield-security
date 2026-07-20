@@ -677,7 +677,6 @@ const Index = () => {
             </div>
 
             {/* Trend chart */}
-            <div className="max-w-2xl">
             <Card>
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -726,7 +725,6 @@ const Index = () => {
                 </ResponsiveContainer>
               </div>
             </Card>
-            </div>
 
             {/* Scanner + Threat Radar */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
@@ -746,7 +744,7 @@ const Index = () => {
                 value={scanText}
                 onChange={(e) => setScanText(e.target.value)}
                 placeholder="Paste suspicious email content, a text message, a URL — or attach a screenshot below…"
-                className="min-h-[120px] bg-secondary/50 border-border resize-none"
+                className="min-h-[200px] bg-secondary/50 border-border resize-none"
                 maxLength={8000}
                 disabled={scanning}
               />
