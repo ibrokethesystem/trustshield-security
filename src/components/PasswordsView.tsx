@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Eye, EyeOff, KeyRound, Lock, Plus, Trash2, ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  Eye, EyeOff, KeyRound, Lock, Plus, Trash2, ShieldCheck, ShieldAlert,
+  Fingerprint, Unlock, LockKeyhole, Cloud, Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 type VaultEntry = {
   id: string;
@@ -92,8 +96,59 @@ export function analyzePassword(pw: string): PasswordStrength {
   return { score, label: labels[score], color: colors[score], entropyBits: Math.round(entropy), crackTime, tips };
 }
 
-function storageKey(userId: string | undefined) {
+function localVaultKey(userId: string | undefined) {
   return `trust-shield:vault:${userId ?? "anon"}`;
+}
+
+// SHA-256 hex
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+const WEBAUTHN_LOCAL_KEY = (uid: string) => `trust-shield:webauthn:${uid}`;
+
+function isWebAuthnSupported() {
+  return typeof window !== "undefined" && "PublicKeyCredential" in window;
+}
+
+async function registerFingerprintCredential(userId: string, userLabel: string): Promise<string> {
+  if (!isWebAuthnSupported()) throw new Error("Fingerprint / biometric not supported on this device");
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  const userIdBytes = new TextEncoder().encode(userId);
+  const cred = (await navigator.credentials.create({
+    publicKey: {
+      challenge,
+      rp: { name: "Trust Shield" },
+      user: { id: userIdBytes, name: userLabel, displayName: userLabel },
+      pubKeyCredParams: [{ alg: -7, type: "public-key" }, { alg: -257, type: "public-key" }],
+      authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required", residentKey: "preferred" },
+      timeout: 60000,
+      attestation: "none",
+    },
+  })) as PublicKeyCredential | null;
+  if (!cred) throw new Error("Registration cancelled");
+  const idB64 = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+  return idB64;
+}
+
+async function verifyFingerprintCredential(credentialIdB64: string): Promise<boolean> {
+  if (!isWebAuthnSupported()) return false;
+  const raw = Uint8Array.from(atob(credentialIdB64), (c) => c.charCodeAt(0));
+  const challenge = crypto.getRandomValues(new Uint8Array(32));
+  try {
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ id: raw, type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000,
+      },
+    });
+    return !!assertion;
+  } catch {
+    return false;
+  }
 }
 
 export default function PasswordsView({ userId }: { userId: string | undefined }) {
@@ -106,17 +161,24 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
   const [form, setForm] = useState<{ label: string; username: string; password: string; notes: string }>({
     label: "", username: "", password: "", notes: "",
   });
+  const [loading, setLoading] = useState<boolean>(!!userId);
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(userId));
-      setEntries(raw ? JSON.parse(raw) : []);
-    } catch { setEntries([]); }
-  }, [userId]);
+  // Lock state
+  const [lockEnabled, setLockEnabled] = useState(false);
+  const [pinHash, setPinHash] = useState<string | null>(null);
+  const [pinSalt, setPinSalt] = useState<string | null>(null);
+  const [unlocked, setUnlocked] = useState(false);
+  const [unlockPin, setUnlockPin] = useState("");
+  const [fingerprintReady, setFingerprintReady] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const persist = (next: VaultEntry[]) => {
-    setEntries(next);
-    try { localStorage.setItem(storageKey(userId), JSON.stringify(next)); } catch {}
+  // Setup form
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [newPin, setNewPin] = useState("");
+  const [newPin2, setNewPin2] = useState("");
+  const [enrollFinger, setEnrollFinger] = useState(false);
+
+  const updateSummary = useCallback((next: VaultEntry[]) => {
     try {
       const summary = {
         count: next.length,
@@ -128,36 +190,183 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
       localStorage.setItem(`trust-shield:vault-summary:${userId ?? "anon"}`, JSON.stringify(summary));
       localStorage.setItem(`trust-shield:vault-summary:current`, JSON.stringify(summary));
     } catch {}
-  };
+  }, [userId]);
 
-  const add = () => {
+  // Load entries + settings when signed in
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!userId) {
+        try {
+          const raw = localStorage.getItem(localVaultKey(undefined));
+          const list: VaultEntry[] = raw ? JSON.parse(raw) : [];
+          if (!cancelled) { setEntries(list); updateSummary(list); }
+        } catch { if (!cancelled) setEntries([]); }
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+
+      // Migrate any pre-existing local entries to cloud (one-time)
+      try {
+        const legacyRaw = localStorage.getItem(localVaultKey(userId));
+        if (legacyRaw) {
+          const legacy: VaultEntry[] = JSON.parse(legacyRaw);
+          if (Array.isArray(legacy) && legacy.length > 0) {
+            const rows = legacy.map((e) => ({
+              user_id: userId, label: e.label, username: e.username || "", password: e.password, notes: e.notes || "",
+            }));
+            await supabase.from("vault_entries").insert(rows);
+          }
+          localStorage.removeItem(localVaultKey(userId));
+        }
+      } catch {}
+
+      const [{ data: rows }, { data: setting }] = await Promise.all([
+        supabase.from("vault_entries").select("*").eq("user_id", userId).order("updated_at", { ascending: false }),
+        supabase.from("vault_settings").select("*").eq("user_id", userId).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
+        id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", updated_at: r.updated_at,
+      }));
+      setEntries(list);
+      updateSummary(list);
+
+      const enabled = !!setting?.lock_enabled;
+      setLockEnabled(enabled);
+      setPinHash(setting?.pin_hash ?? null);
+      setPinSalt(setting?.pin_salt ?? null);
+      setUnlocked(!enabled); // if lock off, treat as unlocked
+
+      // Fingerprint registered on this device?
+      try {
+        const local = localStorage.getItem(WEBAUTHN_LOCAL_KEY(userId));
+        setFingerprintReady(!!local && isWebAuthnSupported());
+      } catch {}
+
+      setLoading(false);
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [userId, updateSummary]);
+
+  const add = async () => {
     if (!form.label.trim() || !form.password) {
       toast.error("Add at least a label and a password.");
       return;
     }
-    const entry: VaultEntry = {
-      id: crypto.randomUUID(),
-      label: form.label.trim(),
-      username: form.username.trim(),
-      password: form.password,
-      notes: form.notes.trim(),
-      updated_at: new Date().toISOString(),
-    };
-    persist([entry, ...entries]);
+    if (userId) {
+      const { data, error } = await supabase
+        .from("vault_entries")
+        .insert({ user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() })
+        .select()
+        .single();
+      if (error || !data) { toast.error("Couldn't save", { description: error?.message }); return; }
+      const entry: VaultEntry = { id: data.id, label: data.label, username: data.username ?? "", password: data.password, notes: data.notes ?? "", updated_at: data.updated_at };
+      const next = [entry, ...entries];
+      setEntries(next); updateSummary(next);
+      toast.success("Saved and synced to your account");
+    } else {
+      const entry: VaultEntry = { id: crypto.randomUUID(), label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), updated_at: new Date().toISOString() };
+      const next = [entry, ...entries];
+      setEntries(next); updateSummary(next);
+      try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {}
+      toast.success("Saved locally (sign in to sync across devices)");
+    }
     setForm({ label: "", username: "", password: "", notes: "" });
-    toast.success("Saved to your local vault");
   };
 
-  const remove = (id: string) => {
-    persist(entries.filter((e) => e.id !== id));
+  const remove = async (id: string) => {
+    if (userId) {
+      const { error } = await supabase.from("vault_entries").delete().eq("id", id).eq("user_id", userId);
+      if (error) { toast.error("Couldn't delete", { description: error.message }); return; }
+    }
+    const next = entries.filter((e) => e.id !== id);
+    setEntries(next); updateSummary(next);
+    if (!userId) { try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {} }
   };
 
   const copy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); toast.success("Copied"); }
+    catch { toast.error("Couldn't copy"); }
+  };
+
+  // ===== Lock helpers =====
+  const enableLock = async () => {
+    if (!userId) { toast.error("Sign in to enable the vault lock across devices."); return; }
+    if (newPin.length < 4) { toast.error("Use at least 4 characters for the unlock code."); return; }
+    if (newPin !== newPin2) { toast.error("Codes don't match."); return; }
+    setBusy(true);
     try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Copied");
-    } catch {
-      toast.error("Couldn't copy");
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const hash = await sha256Hex(saltHex + ":" + newPin);
+      const { error } = await supabase.from("vault_settings").upsert({
+        user_id: userId, lock_enabled: true, pin_hash: hash, pin_salt: saltHex,
+      });
+      if (error) throw error;
+      setLockEnabled(true); setPinHash(hash); setPinSalt(saltHex); setUnlocked(true);
+
+      if (enrollFinger) {
+        try {
+          const credId = await registerFingerprintCredential(userId, "Trust Shield vault");
+          localStorage.setItem(WEBAUTHN_LOCAL_KEY(userId), credId);
+          setFingerprintReady(true);
+          toast.success("Fingerprint enrolled on this device");
+        } catch (e) {
+          toast.error("Couldn't enroll fingerprint", { description: e instanceof Error ? e.message : "" });
+        }
+      }
+
+      setSetupOpen(false); setNewPin(""); setNewPin2(""); setEnrollFinger(false);
+      toast.success("Vault lock enabled");
+    } catch (e) {
+      toast.error("Couldn't enable lock", { description: e instanceof Error ? e.message : "" });
+    } finally { setBusy(false); }
+  };
+
+  const disableLock = async () => {
+    if (!userId) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from("vault_settings").upsert({
+        user_id: userId, lock_enabled: false, pin_hash: null, pin_salt: null,
+      });
+      if (error) throw error;
+      try { localStorage.removeItem(WEBAUTHN_LOCAL_KEY(userId)); } catch {}
+      setLockEnabled(false); setPinHash(null); setPinSalt(null); setUnlocked(true); setFingerprintReady(false);
+      toast.success("Vault lock removed");
+    } catch (e) {
+      toast.error("Couldn't disable lock", { description: e instanceof Error ? e.message : "" });
+    } finally { setBusy(false); }
+  };
+
+  const tryUnlockPin = async () => {
+    if (!pinHash || !pinSalt) return;
+    const hash = await sha256Hex(pinSalt + ":" + unlockPin);
+    if (hash === pinHash) { setUnlocked(true); setUnlockPin(""); toast.success("Vault unlocked"); }
+    else toast.error("Wrong code");
+  };
+
+  const tryUnlockFingerprint = async () => {
+    if (!userId) return;
+    const credId = localStorage.getItem(WEBAUTHN_LOCAL_KEY(userId));
+    if (!credId) { toast.error("No fingerprint enrolled on this device"); return; }
+    const ok = await verifyFingerprintCredential(credId);
+    if (ok) { setUnlocked(true); toast.success("Vault unlocked"); }
+    else toast.error("Fingerprint check failed");
+  };
+
+  const enrollFingerprintNow = async () => {
+    if (!userId) return;
+    try {
+      const credId = await registerFingerprintCredential(userId, "Trust Shield vault");
+      localStorage.setItem(WEBAUTHN_LOCAL_KEY(userId), credId);
+      setFingerprintReady(true);
+      toast.success("Fingerprint enrolled on this device");
+    } catch (e) {
+      toast.error("Couldn't enroll fingerprint", { description: e instanceof Error ? e.message : "" });
     }
   };
 
@@ -168,7 +377,9 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
           <KeyRound className="h-6 w-6 text-primary" /> Password security
         </h2>
         <p className="text-sm text-muted-foreground">
-          Check password strength and keep a private reference vault. Nothing here leaves your browser.
+          {userId
+            ? "Check password strength and keep a synced vault across your devices."
+            : "Check password strength and keep a local vault. Sign in to sync across devices."}
         </p>
       </header>
 
@@ -210,11 +421,115 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
 
       {/* Vault */}
       <div className="rounded-xl border border-border/60 bg-card/50 p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium flex items-center gap-2"><Lock className="h-4 w-4 text-primary" /> Password reference vault</h3>
-          <span className="text-xs text-muted-foreground">{entries.length} saved · local only</span>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="font-medium flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary" /> Password reference vault
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {userId ? (
+              <span className="inline-flex items-center gap-1"><Cloud className="h-3.5 w-3.5" /> Synced to your account</span>
+            ) : (
+              <span>Local only — sign in to sync</span>
+            )}
+            <span>· {entries.length} saved</span>
+          </div>
         </div>
 
+        {/* Lock controls */}
+        {userId && (
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 p-3 flex-wrap gap-2">
+            <div className="text-sm flex items-center gap-2">
+              {lockEnabled ? <LockKeyhole className="h-4 w-4 text-primary" /> : <Unlock className="h-4 w-4 text-muted-foreground" />}
+              <div>
+                <div className="font-medium">
+                  {lockEnabled ? (unlocked ? "Vault unlocked" : "Vault locked") : "Vault lock is off"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {lockEnabled
+                    ? "Requires your unlock code or fingerprint before showing saved passwords."
+                    : "Turn on a lock so a code or fingerprint is required to open the vault."}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {!lockEnabled ? (
+                <Button size="sm" onClick={() => setSetupOpen(true)}><LockKeyhole className="h-3.5 w-3.5 mr-1" /> Turn on lock</Button>
+              ) : (
+                <>
+                  {unlocked && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setUnlocked(false)}>Lock now</Button>
+                      {isWebAuthnSupported() && !fingerprintReady && (
+                        <Button size="sm" variant="outline" onClick={enrollFingerprintNow}>
+                          <Fingerprint className="h-3.5 w-3.5 mr-1" /> Add fingerprint on this device
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={disableLock} disabled={busy}>Remove lock</Button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Setup lock dialog (inline) */}
+        {setupOpen && (
+          <div className="rounded-lg border border-primary/40 bg-card p-4 space-y-3">
+            <div className="font-medium flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-primary" /> Set a vault unlock code</div>
+            <p className="text-xs text-muted-foreground">You'll enter this code (or use your fingerprint on supported devices) each time you open the vault. Choose something you can remember — it can't be recovered if lost.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Unlock code</Label>
+                <Input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="At least 4 characters" />
+              </div>
+              <div>
+                <Label className="text-xs">Confirm code</Label>
+                <Input type="password" value={newPin2} onChange={(e) => setNewPin2(e.target.value)} placeholder="Repeat" />
+              </div>
+            </div>
+            {isWebAuthnSupported() && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={enrollFinger} onChange={(e) => setEnrollFinger(e.target.checked)} />
+                <Fingerprint className="h-4 w-4" /> Also enroll fingerprint / device biometrics on this device
+              </label>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => { setSetupOpen(false); setNewPin(""); setNewPin2(""); }}>Cancel</Button>
+              <Button size="sm" onClick={enableLock} disabled={busy}>
+                {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Enable lock
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Lock gate */}
+        {userId && lockEnabled && !unlocked ? (
+          <div className="rounded-lg border border-border/60 bg-muted/10 p-6 text-center space-y-4">
+            <LockKeyhole className="h-8 w-8 mx-auto text-primary" />
+            <div>
+              <div className="font-medium">Vault is locked</div>
+              <div className="text-xs text-muted-foreground">Enter your unlock code {fingerprintReady ? "or use your fingerprint" : ""} to view saved passwords.</div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+              <Input
+                type="password"
+                value={unlockPin}
+                onChange={(e) => setUnlockPin(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") tryUnlockPin(); }}
+                placeholder="Unlock code"
+                autoFocus
+              />
+              <Button onClick={tryUnlockPin}>Unlock</Button>
+            </div>
+            {fingerprintReady && (
+              <Button variant="outline" onClick={tryUnlockFingerprint} className="gap-2">
+                <Fingerprint className="h-4 w-4" /> Use fingerprint
+              </Button>
+            )}
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label className="text-xs">Label</Label>
@@ -235,8 +550,10 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
         </div>
         <Button onClick={add} className="gap-2"><Plus className="h-4 w-4" /> Save to vault</Button>
 
-        {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground pt-2">Nothing saved yet. Entries stay on this device only.</p>
+        {loading ? (
+          <p className="text-sm text-muted-foreground pt-2 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading vault…</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground pt-2">Nothing saved yet.</p>
         ) : (
           <ul className="divide-y divide-border/60 pt-2">
             {entries.map((e) => {
@@ -269,9 +586,13 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
             })}
           </ul>
         )}
+        </>
+        )}
 
         <div className="text-xs text-muted-foreground bg-muted/30 border border-border/40 rounded-lg p-3">
-          Vault entries are saved in this browser's local storage only. They are never uploaded to Trust Shield's servers or shared with Cyber Guardian. Clear your browser data to remove them.
+          {userId
+            ? "Vault entries sync securely to your Trust Shield account so they appear on every device you sign in to. Cyber Guardian only sees anonymized counts, never the passwords themselves."
+            : "Sign in to sync your vault across devices. Until then, entries stay in this browser only."}
         </div>
       </div>
     </section>
