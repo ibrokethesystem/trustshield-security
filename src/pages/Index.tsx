@@ -36,6 +36,7 @@ import {
   Share2,
   Copy,
   MessageSquare,
+  KeyRound,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
+import PasswordsView, { analyzePassword } from "@/components/PasswordsView";
 
 type Threat = {
   id: string;
@@ -90,10 +92,11 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
+  { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "network", label: "Network safety", icon: Wifi },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
