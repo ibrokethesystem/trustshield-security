@@ -208,6 +208,12 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
   const [newPin2, setNewPin2] = useState("");
   const [enrollFinger, setEnrollFinger] = useState(false);
 
+  // Change-password form
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [currentPin, setCurrentPin] = useState("");
+  const [changePin, setChangePin] = useState("");
+  const [changePin2, setChangePin2] = useState("");
+
   const updateSummary = useCallback((next: VaultEntry[]) => {
     try {
       const summary = {
@@ -372,6 +378,29 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
     } finally { setBusy(false); }
   };
 
+  const changeLockPassword = async () => {
+    if (!userId || !pinHash || !pinSalt) return;
+    if (changePin.length < 4) { toast.error("New code must be at least 4 characters."); return; }
+    if (changePin !== changePin2) { toast.error("New codes don't match."); return; }
+    setBusy(true);
+    try {
+      const currentHash = await sha256Hex(pinSalt + ":" + currentPin);
+      if (currentHash !== pinHash) { toast.error("Current password is incorrect"); setBusy(false); return; }
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
+      const hash = await sha256Hex(saltHex + ":" + changePin);
+      const { error } = await supabase.from("vault_settings").upsert({
+        user_id: userId, lock_enabled: true, pin_hash: hash, pin_salt: saltHex,
+      });
+      if (error) throw error;
+      setPinHash(hash); setPinSalt(saltHex);
+      setChangeOpen(false); setCurrentPin(""); setChangePin(""); setChangePin2("");
+      toast.success("Lock password changed");
+    } catch (e) {
+      toast.error("Couldn't change password", { description: e instanceof Error ? e.message : "" });
+    } finally { setBusy(false); }
+  };
+
   const tryUnlockPin = async () => {
     if (!pinHash || !pinSalt) return;
     const hash = await sha256Hex(pinSalt + ":" + unlockPin);
@@ -489,6 +518,7 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
                   {unlocked && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setUnlocked(false)}>Lock now</Button>
+                      <Button size="sm" variant="outline" onClick={() => setChangeOpen((v) => !v)}>Change lock password</Button>
                       {isWebAuthnSupported() && !fingerprintReady && (
                         <Button size="sm" variant="outline" onClick={enrollFingerprintNow}>
                           <Fingerprint className="h-3.5 w-3.5 mr-1" /> Add fingerprint on this device
@@ -528,6 +558,34 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
               <Button variant="ghost" size="sm" onClick={() => { setSetupOpen(false); setNewPin(""); setNewPin2(""); }}>Cancel</Button>
               <Button size="sm" onClick={enableLock} disabled={busy}>
                 {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Enable lock
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Change lock password (inline) */}
+        {changeOpen && lockEnabled && unlocked && (
+          <div className="rounded-lg border border-primary/40 bg-card p-4 space-y-3">
+            <div className="font-medium flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-primary" /> Change lock password</div>
+            <p className="text-xs text-muted-foreground">Enter your current unlock code, then set a new one. Fingerprint cannot be used to authorize this change.</p>
+            <div>
+              <Label className="text-xs">Current unlock code</Label>
+              <Input type="password" value={currentPin} onChange={(e) => setCurrentPin(e.target.value)} placeholder="Current code" autoComplete="current-password" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">New code</Label>
+                <Input type="password" value={changePin} onChange={(e) => setChangePin(e.target.value)} placeholder="At least 4 characters" autoComplete="new-password" />
+              </div>
+              <div>
+                <Label className="text-xs">Confirm new code</Label>
+                <Input type="password" value={changePin2} onChange={(e) => setChangePin2(e.target.value)} placeholder="Repeat" autoComplete="new-password" />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => { setChangeOpen(false); setCurrentPin(""); setChangePin(""); setChangePin2(""); }}>Cancel</Button>
+              <Button size="sm" onClick={changeLockPassword} disabled={busy}>
+                {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Change password
               </Button>
             </div>
           </div>
