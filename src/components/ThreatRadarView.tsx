@@ -221,7 +221,7 @@ export default function ThreatRadarView({ userId }: { userId?: string }) {
           <Input
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            placeholder="example.com or 203.0.113.42"
+            placeholder="example.com"
             onKeyDown={(e) => {
               if (e.key === "Enter") addEntry();
             }}
@@ -229,7 +229,7 @@ export default function ThreatRadarView({ userId }: { userId?: string }) {
           <Input
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Optional label (e.g. Company mail server)"
+            placeholder="Optional label"
             onKeyDown={(e) => {
               if (e.key === "Enter") addEntry();
             }}
