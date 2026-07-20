@@ -64,6 +64,44 @@ import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+
+type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
+
+const UPDATES: UpdateNote[] = [
+  {
+    id: "1.9.5",
+    version: "1.9.5",
+    name: "Inbox & release notes",
+    date: "2026-07-20",
+    summary:
+      "Added an inbox next to your profile so you'll always see what's new in Trust Shield. A red badge appears when a fresh update ships.",
+  },
+  {
+    id: "1.9.4",
+    version: "1.9.4",
+    name: "Autofill for Chrome & Edge",
+    date: "2026-07-15",
+    summary:
+      "Password vault entries can now sync a URL to the Chrome and Edge extensions and autofill logins with one click.",
+  },
+  {
+    id: "1.9.3",
+    version: "1.9.3",
+    name: "Threat Radar",
+    date: "2026-07-10",
+    summary:
+      "Watch a list of domains and IPs and get toast alerts when they show up in URLhaus or VirusTotal threat feeds.",
+  },
+  {
+    id: "1.9.2",
+    version: "1.9.2",
+    name: "File Scanner tab",
+    date: "2026-07-05",
+    summary:
+      "File scanning moved into its own sidebar tab with batch uploads, SHA-256 hashing, and VirusTotal analytics.",
+  },
+];
 
 type Threat = {
   id: string;
