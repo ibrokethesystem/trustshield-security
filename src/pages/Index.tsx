@@ -33,14 +33,7 @@ import {
   Download,
   FileScan,
 } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip as ReTooltip,
-} from "recharts";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -86,41 +79,12 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "malware";
+type ViewKey = "dashboard" | "history" | "guardian";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "history", label: "Scan history", icon: History },
-  { key: "malware", label: "Malware detectors", icon: ShieldCheck },
 ];
-
-function MalwareDetectorsView() {
-  return (
-    <section className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
-          <ShieldCheck className="w-5 h-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="text-2xl font-semibold">Malware detectors</h2>
-          <p className="text-sm text-muted-foreground">
-            Download trusted malware detection tools for your device.
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card/40 p-12 text-center">
-        <div className="w-14 h-14 mx-auto rounded-full bg-muted/40 flex items-center justify-center mb-4">
-          <Download className="w-6 h-6 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-medium mb-1">Nothing here yet</h3>
-        <p className="text-sm text-muted-foreground">
-          Malware detector downloads will appear in this section soon.
-        </p>
-      </div>
-    </section>
-  );
-}
 
 const severityStyles: Record<Threat["severity"], string> = {
   low: "bg-blue-500/10 text-blue-400 border-blue-500/30",
@@ -276,9 +240,7 @@ const Index = () => {
     setNameDraft(name);
     setAvatarPath(data?.avatar_path ?? null);
     if (data?.avatar_path) {
-      const { data: signed } = await supabase.storage
-        .from("avatars")
-        .createSignedUrl(data.avatar_path, 3600);
+      const { data: signed } = await supabase.storage.from("avatars").createSignedUrl(data.avatar_path, 3600);
       setAvatarUrl(signed?.signedUrl ?? null);
     } else {
       setAvatarUrl(null);
@@ -297,9 +259,7 @@ const Index = () => {
       return;
     }
     setSavingProfile(true);
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({ id: user.id, display_name: name });
+    const { error } = await supabase.from("profiles").upsert({ id: user.id, display_name: name });
     setSavingProfile(false);
     if (error) {
       toast.error("Couldn't save", { description: error.message });
@@ -322,9 +282,7 @@ const Index = () => {
     setUploadingAvatar(true);
     const ext = file.name.split(".").pop() || "png";
     const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true });
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
     if (upErr) {
       setUploadingAvatar(false);
       toast.error("Upload failed", { description: upErr.message });
@@ -334,18 +292,14 @@ const Index = () => {
     if (avatarPath) {
       await supabase.storage.from("avatars").remove([avatarPath]);
     }
-    const { error: profErr } = await supabase
-      .from("profiles")
-      .upsert({ id: user.id, avatar_path: path });
+    const { error: profErr } = await supabase.from("profiles").upsert({ id: user.id, avatar_path: path });
     if (profErr) {
       setUploadingAvatar(false);
       toast.error("Couldn't save avatar", { description: profErr.message });
       return;
     }
     setAvatarPath(path);
-    const { data: signed } = await supabase.storage
-      .from("avatars")
-      .createSignedUrl(path, 3600);
+    const { data: signed } = await supabase.storage.from("avatars").createSignedUrl(path, 3600);
     setAvatarUrl(signed?.signedUrl ?? null);
     setUploadingAvatar(false);
     toast.success("Profile picture updated");
@@ -353,7 +307,10 @@ const Index = () => {
 
   const activeThreats = useMemo(() => (threats ?? []).filter((t) => t.status === "active"), [threats]);
   const dismissedCount = useMemo(() => (threats ?? []).filter((t) => t.status !== "active").length, [threats]);
-  const criticalCount = useMemo(() => activeThreats.filter((t) => t.severity === "critical" || t.severity === "high").length, [activeThreats]);
+  const criticalCount = useMemo(
+    () => activeThreats.filter((t) => t.severity === "critical" || t.severity === "high").length,
+    [activeThreats],
+  );
 
   const securityScore = useMemo(() => {
     const active = activeThreats.length;
@@ -415,8 +372,8 @@ const Index = () => {
       const verdict = analysis.is_threat
         ? "threat"
         : level === "elevated" || level === "high" || score >= 40
-        ? "caution"
-        : "safe";
+          ? "caution"
+          : "safe";
       const snippet = content ? content.slice(0, 240) : null;
       const { data: histRow } = await supabase
         .from("scan_history")
@@ -628,7 +585,7 @@ const Index = () => {
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                 view === item.key
                   ? "bg-secondary text-foreground"
-                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                  : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
               )}
             >
               <item.icon className="w-4 h-4" />
@@ -651,8 +608,7 @@ const Index = () => {
                 a.click();
                 URL.revokeObjectURL(a.href);
                 toast.success("Chrome extension downloaded", {
-                  description:
-                    "Unzip it, open chrome://extensions, enable Developer mode, then click 'Load unpacked'.",
+                  description: "Unzip it, open chrome://extensions, enable Developer mode, then click 'Load unpacked'.",
                   duration: 9000,
                 });
               })
@@ -686,7 +642,10 @@ const Index = () => {
             >
               {displayName || user.email}
             </button>
-            <button onClick={signOut} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+            <button
+              onClick={signOut}
+              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
               <LogOut className="w-3 h-3" /> Sign out
             </button>
           </div>
@@ -706,11 +665,17 @@ const Index = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
-              hasActive ? "bg-destructive/10 text-destructive border-destructive/30" : "bg-green-500/10 text-green-400 border-green-500/30"
-            )}>
-              <span className={cn("w-1.5 h-1.5 rounded-full", hasActive ? "bg-destructive animate-pulse" : "bg-green-400")} />
+            <div
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
+                hasActive
+                  ? "bg-destructive/10 text-destructive border-destructive/30"
+                  : "bg-green-500/10 text-green-400 border-green-500/30",
+              )}
+            >
+              <span
+                className={cn("w-1.5 h-1.5 rounded-full", hasActive ? "bg-destructive animate-pulse" : "bg-green-400")}
+              />
               {hasActive ? "AT RISK" : "PROTECTED"}
             </div>
           </div>
@@ -718,170 +683,227 @@ const Index = () => {
 
         {view === "dashboard" ? (
           <>
-        {/* Stat cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <SecurityScoreCard score={securityScore} />
-          <StatCard icon={AlertTriangle} iconClass="text-destructive bg-destructive/10" label="Active threats" value={activeThreats.length} />
-          <StatCard icon={ShieldCheck} iconClass="text-orange-400 bg-orange-400/10" label="High / critical" value={criticalCount} />
-          <StatCard icon={CheckCircle2} iconClass="text-green-400 bg-green-400/10" label="Resolved" value={dismissedCount} />
-        </div>
-
-        {/* Trend chart */}
-        <Card>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Activity className="w-5 h-5 text-primary" /> Threats over the last 14 days
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Every confirmed threat you've scanned, grouped by day.
-              </p>
+            {/* Stat cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <SecurityScoreCard score={securityScore} />
+              <StatCard
+                icon={AlertTriangle}
+                iconClass="text-destructive bg-destructive/10"
+                label="Active threats"
+                value={activeThreats.length}
+              />
+              <StatCard
+                icon={ShieldCheck}
+                iconClass="text-orange-400 bg-orange-400/10"
+                label="High / critical"
+                value={criticalCount}
+              />
+              <StatCard
+                icon={CheckCircle2}
+                iconClass="text-green-400 bg-green-400/10"
+                label="Resolved"
+                value={dismissedCount}
+              />
             </div>
-          </div>
-          <div className="h-[180px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
-                <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} allowDecimals={false} width={36} tickMargin={6} />
-                <ReTooltip
-                  contentStyle={{
-                    background: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: 8,
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
-                />
-                <Line type="monotone" dataKey="threats" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: "hsl(var(--primary))" }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
 
-        {/* Scanner */}
-        <Card>
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <ScanLine className="w-5 h-5 text-primary" /> Scan a message or link
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1">
-                Paste an email, text/SMS, chat message, URL, or QR-code text. Trust Shield's AI checks it for phishing, fake login pages, crypto/investment scams, impersonation, and other threats.
-              </p>
-            </div>
-          </div>
-          <Textarea
-            value={scanText}
-            onChange={(e) => setScanText(e.target.value)}
-            placeholder="Paste suspicious email content, a text message, a URL — or attach a screenshot below…"
-            className="min-h-[120px] bg-secondary/50 border-border resize-none"
-            maxLength={8000}
-            disabled={scanning}
-          />
-          {scanImage ? (
-            <div className="mt-3 flex items-start gap-3 p-3 rounded-lg border border-border bg-secondary/40">
-              <img src={scanImage.dataUrl} alt="" className="w-20 h-20 rounded-md object-cover border border-border" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium truncate">{scanImage.name}</p>
-                <p className="text-[11px] text-muted-foreground">Screenshot attached — will be analyzed with your text.</p>
+            {/* Trend chart */}
+            <Card>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-primary" /> Threats over the last 14 days
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Every confirmed threat you've scanned, grouped by day.
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setScanImage(null)}
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData} margin={{ top: 6, right: 8, left: 8, bottom: 0 }}>
+                    <XAxis
+                      dataKey="day"
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      axisLine={false}
+                      tickLine={false}
+                      allowDecimals={false}
+                      width={36}
+                      tickMargin={6}
+                    />
+                    <ReTooltip
+                      contentStyle={{
+                        background: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="threats"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: "hsl(var(--primary))" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
+            {/* Scanner */}
+            <Card>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <ScanLine className="w-5 h-5 text-primary" /> Scan a message or link
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Paste an email, text/SMS, chat message, URL, or QR-code text. Trust Shield's AI checks it for
+                    phishing, fake login pages, crypto/investment scams, impersonation, and other threats.
+                  </p>
+                </div>
+              </div>
+              <Textarea
+                value={scanText}
+                onChange={(e) => setScanText(e.target.value)}
+                placeholder="Paste suspicious email content, a text message, a URL — or attach a screenshot below…"
+                className="min-h-[120px] bg-secondary/50 border-border resize-none"
+                maxLength={8000}
                 disabled={scanning}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Remove
-              </button>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-3">
-              <label className={cn(
-                "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
-                scanning || imageLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-secondary/60 bg-secondary/30"
-              )}>
-                {imageLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
-                {scanImage ? "Replace screenshot" : "Attach screenshot"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={scanning || imageLoading}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleImagePick(f);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <label className={cn(
-                "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
-                fileScanning || scanning ? "opacity-50 cursor-not-allowed" : "hover:bg-secondary/60 bg-secondary/30"
-              )}>
-                {fileScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileScan className="w-3.5 h-3.5" />}
-                {fileScanning ? "Scanning file…" : "Scan a file"}
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={fileScanning || scanning}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFileScan(f);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
-            </div>
-            <Button
-              onClick={runScan}
-              disabled={scanning || (scanText.trim().length < 3 && !scanImage)}
-              className="bg-gradient-shield hover:opacity-90 glow-shield gap-2"
-            >
-              {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
-              {scanning ? "Analyzing…" : "Scan now"}
-            </Button>
-          </div>
-        </Card>
-
-        {/* Threats list */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-lg">Detected threats</h3>
-            {threats && threats.length > 0 && (
-              <p className="text-xs text-muted-foreground">{threats.length} total</p>
-            )}
-          </div>
-
-          {threats === null ? (
-            <div className="bg-card border border-border rounded-2xl p-10 flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : threats.length === 0 ? (
-            <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center text-center">
-              <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center mb-3">
-                <ShieldCheck className="w-7 h-7 text-green-400" />
+              />
+              {scanImage ? (
+                <div className="mt-3 flex items-start gap-3 p-3 rounded-lg border border-border bg-secondary/40">
+                  <img
+                    src={scanImage.dataUrl}
+                    alt=""
+                    className="w-20 h-20 rounded-md object-cover border border-border"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{scanImage.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Screenshot attached — will be analyzed with your text.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setScanImage(null)}
+                    disabled={scanning}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between mt-3">
+                <div className="flex items-center gap-3">
+                  <label
+                    className={cn(
+                      "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
+                      scanning || imageLoading
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-secondary/60 bg-secondary/30",
+                    )}
+                  >
+                    {imageLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                    {scanImage ? "Replace screenshot" : "Attach screenshot"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={scanning || imageLoading}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleImagePick(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <label
+                    className={cn(
+                      "inline-flex items-center gap-2 text-xs px-3 py-2 rounded-md border border-border cursor-pointer transition",
+                      fileScanning || scanning
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-secondary/60 bg-secondary/30",
+                    )}
+                  >
+                    {fileScanning ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <FileScan className="w-3.5 h-3.5" />
+                    )}
+                    {fileScanning ? "Scanning file…" : "Scan a file"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      disabled={fileScanning || scanning}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleFileScan(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <span className="text-xs text-muted-foreground">{scanText.length} / 8000</span>
+                </div>
+                <Button
+                  onClick={runScan}
+                  disabled={scanning || (scanText.trim().length < 3 && !scanImage)}
+                  className="bg-gradient-shield hover:opacity-90 glow-shield gap-2"
+                >
+                  {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+                  {scanning ? "Analyzing…" : "Scan now"}
+                </Button>
               </div>
-              <h4 className="font-semibold">You're all clear</h4>
-              <p className="text-sm text-muted-foreground max-w-sm mt-1">
-                No threats detected yet. Paste anything suspicious above to scan it, and confirmed threats will show up here.
-              </p>
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {threats.map((t) => (
-                <ThreatRow
-                  key={t.id}
-                  threat={t}
-                  onDismiss={() => updateStatus(t.id, "dismissed")}
-                  onBlock={() => updateStatus(t.id, "blocked")}
-                  onDelete={() => deleteThreat(t.id)}
-                />
-              ))}
-            </ul>
-          )}
-        </section>
+            </Card>
+
+            {/* Threats list */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-lg">Detected threats</h3>
+                {threats && threats.length > 0 && (
+                  <p className="text-xs text-muted-foreground">{threats.length} total</p>
+                )}
+              </div>
+
+              {threats === null ? (
+                <div className="bg-card border border-border rounded-2xl p-10 flex items-center justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : threats.length === 0 ? (
+                <div className="bg-card border border-border rounded-2xl p-10 flex flex-col items-center text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center mb-3">
+                    <ShieldCheck className="w-7 h-7 text-green-400" />
+                  </div>
+                  <h4 className="font-semibold">You're all clear</h4>
+                  <p className="text-sm text-muted-foreground max-w-sm mt-1">
+                    No threats detected yet. Paste anything suspicious above to scan it, and confirmed threats will show
+                    up here.
+                  </p>
+                </div>
+              ) : (
+                <ul className="space-y-3">
+                  {threats.map((t) => (
+                    <ThreatRow
+                      key={t.id}
+                      threat={t}
+                      onDismiss={() => updateStatus(t.id, "dismissed")}
+                      onBlock={() => updateStatus(t.id, "blocked")}
+                      onDelete={() => deleteThreat(t.id)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
           </>
         ) : view === "history" ? (
           <ScanHistoryView
@@ -898,10 +920,8 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
-        ) : view === "guardian" ? (
-          <GuardianView threats={threats ?? []} />
         ) : (
-          <MalwareDetectorsView />
+          <GuardianView threats={threats ?? []} />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
@@ -969,7 +989,9 @@ const Index = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProfileOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setProfileOpen(false)}>
+              Close
+            </Button>
             <Button onClick={saveName} disabled={savingProfile || nameDraft.trim() === displayName}>
               {savingProfile ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save name
@@ -987,10 +1009,10 @@ function SecurityScoreCard({ score }: { score: number }) {
     score >= 80
       ? { ring: "text-green-400", bg: "bg-green-400/10", label: "Healthy" }
       : score >= 60
-      ? { ring: "text-yellow-400", bg: "bg-yellow-400/10", label: "Watch" }
-      : score >= 40
-      ? { ring: "text-orange-400", bg: "bg-orange-400/10", label: "At risk" }
-      : { ring: "text-destructive", bg: "bg-destructive/10", label: "Critical" };
+        ? { ring: "text-yellow-400", bg: "bg-yellow-400/10", label: "Watch" }
+        : score >= 40
+          ? { ring: "text-orange-400", bg: "bg-orange-400/10", label: "At risk" }
+          : { ring: "text-destructive", bg: "bg-destructive/10", label: "Critical" };
   return (
     <div className="bg-card border border-border rounded-2xl p-4">
       <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", tone.ring, tone.bg)}>
@@ -1040,9 +1062,16 @@ function ScanHistoryView({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={onRefresh} className="h-8 text-xs">Refresh</Button>
+          <Button size="sm" variant="outline" onClick={onRefresh} className="h-8 text-xs">
+            Refresh
+          </Button>
           {history && history.length > 0 && (
-            <Button size="sm" variant="outline" onClick={onClear} className="h-8 text-xs text-destructive hover:text-destructive">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onClear}
+              className="h-8 text-xs text-destructive hover:text-destructive"
+            >
               Clear all
             </Button>
           )}
@@ -1066,7 +1095,12 @@ function ScanHistoryView({
         <ul className="space-y-2">
           {history.map((h) => (
             <li key={h.id} className="bg-card border border-border rounded-xl p-3 flex items-start gap-3">
-              <div className={cn("text-[10px] font-semibold px-2 py-1 rounded border uppercase tracking-wider shrink-0", verdictStyles[h.verdict] ?? verdictStyles.safe)}>
+              <div
+                className={cn(
+                  "text-[10px] font-semibold px-2 py-1 rounded border uppercase tracking-wider shrink-0",
+                  verdictStyles[h.verdict] ?? verdictStyles.safe,
+                )}
+              >
                 {verdictLabel[h.verdict] ?? h.verdict}
               </div>
               <div className="flex-1 min-w-0">
@@ -1080,11 +1114,11 @@ function ScanHistoryView({
                   )}
                 </div>
                 {h.snippet && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap break-words">{h.snippet}</p>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 whitespace-pre-wrap break-words">
+                    {h.snippet}
+                  </p>
                 )}
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {new Date(h.created_at).toLocaleString()}
-                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">{new Date(h.created_at).toLocaleString()}</p>
               </div>
             </li>
           ))}
@@ -1116,15 +1150,7 @@ function StatCard({
   );
 }
 
-function AccountStat({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: React.ReactNode;
-}) {
+function AccountStat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
   return (
     <div className="bg-secondary/40 border border-border rounded-lg p-3 flex items-center gap-3">
       <div className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center shrink-0">
@@ -1184,13 +1210,23 @@ function ThreatRow({
   return (
     <li className={cn("bg-card border rounded-2xl p-4", isActive ? "border-border" : "border-border/50 opacity-60")}>
       <div className="flex items-start gap-3">
-        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border", severityStyles[threat.severity])}>
+        <div
+          className={cn(
+            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border",
+            severityStyles[threat.severity],
+          )}
+        >
           <AlertTriangle className="w-5 h-5" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="font-semibold text-sm truncate">{threat.title}</h4>
-            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider", severityStyles[threat.severity])}>
+            <span
+              className={cn(
+                "text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider",
+                severityStyles[threat.severity],
+              )}
+            >
               {threat.severity}
             </span>
             <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
@@ -1202,7 +1238,9 @@ function ThreatRow({
               </span>
             )}
           </div>
-          {threat.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{threat.description}</p>}
+          {threat.description && (
+            <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{threat.description}</p>
+          )}
           <div className="flex items-center gap-2 mt-3">
             <button onClick={() => setOpen((v) => !v)} className="text-xs text-primary hover:underline">
               {open ? "Hide details" : "View details"}
@@ -1216,10 +1254,20 @@ function ThreatRow({
             </button>
             {isActive && (
               <>
-                <Button size="sm" variant="outline" onClick={onBlock} className="h-7 gap-1 text-xs border-border bg-secondary hover:bg-secondary/80">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onBlock}
+                  className="h-7 gap-1 text-xs border-border bg-secondary hover:bg-secondary/80"
+                >
                   <Ban className="w-3 h-3" /> Block source
                 </Button>
-                <Button size="sm" variant="outline" onClick={onDismiss} className="h-7 gap-1 text-xs border-border bg-secondary hover:bg-secondary/80">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onDismiss}
+                  className="h-7 gap-1 text-xs border-border bg-secondary hover:bg-secondary/80"
+                >
                   <CheckCircle2 className="w-3 h-3" /> Dismiss
                 </Button>
               </>
@@ -1243,7 +1291,9 @@ function ThreatRow({
               )}
               {threat.details.suspicious_urls && threat.details.suspicious_urls.length > 0 && (
                 <div>
-                  <p className="font-semibold mb-1 flex items-center gap-1"><Link2 className="w-3 h-3" /> Suspicious links</p>
+                  <p className="font-semibold mb-1 flex items-center gap-1">
+                    <Link2 className="w-3 h-3" /> Suspicious links
+                  </p>
                   <ul className="space-y-0.5 text-destructive font-mono break-all">
                     {threat.details.suspicious_urls.map((u: unknown, idx) => {
                       const text = displayReason(u);
@@ -1272,7 +1322,8 @@ function ThreatRow({
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {messages.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Ask anything about this alert — "Why is this dangerous?", "What if I already clicked?", "How do I check if my account is safe?"
+                    Ask anything about this alert — "Why is this dangerous?", "What if I already clicked?", "How do I
+                    check if my account is safe?"
                   </p>
                 )}
                 {messages.map((m, i) => (
@@ -1280,9 +1331,7 @@ function ThreatRow({
                     key={i}
                     className={cn(
                       "text-xs rounded-lg px-3 py-2 whitespace-pre-wrap",
-                      m.role === "user"
-                        ? "bg-primary/10 text-foreground ml-8"
-                        : "bg-secondary/60 text-foreground mr-8"
+                      m.role === "user" ? "bg-primary/10 text-foreground ml-8" : "bg-secondary/60 text-foreground mr-8",
                     )}
                   >
                     {m.content}
@@ -1345,22 +1394,22 @@ function GuardianView({ threats }: { threats: Threat[] }) {
           "I clicked a phishing link. What now?",
         ]
       : mode === "all"
-      ? [
-          "Summarize all my alerts and what to fix first.",
-          "Which of my threats is the most dangerous?",
-          "What patterns do you see in my alerts?",
-        ]
-      : mode === "threat"
-      ? [
-          "Why is this dangerous?",
-          "What should I do about this specific alert?",
-          "Is my account compromised because of this?",
-        ]
-      : [
-          "How do I spot a phishing email?",
-          "How do I keep my computer safe day-to-day?",
-          "What is 2FA and how do I turn it on?",
-        ];
+        ? [
+            "Summarize all my alerts and what to fix first.",
+            "Which of my threats is the most dangerous?",
+            "What patterns do you see in my alerts?",
+          ]
+        : mode === "threat"
+          ? [
+              "Why is this dangerous?",
+              "What should I do about this specific alert?",
+              "Is my account compromised because of this?",
+            ]
+          : [
+              "How do I spot a phishing email?",
+              "How do I keep my computer safe day-to-day?",
+              "What is 2FA and how do I turn it on?",
+            ];
 
   const send = async (override?: string) => {
     const text = (override ?? input).trim();
@@ -1412,7 +1461,8 @@ function GuardianView({ threats }: { threats: Threat[] }) {
           <div className="flex-1">
             <h3 className="font-semibold text-lg">Cyber Guardian</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Ask about all your alerts, dig into a specific one, or get emergency safety steps if something bad is happening right now.
+              Ask about all your alerts, dig into a specific one, or get emergency safety steps if something bad is
+              happening right now.
             </p>
           </div>
         </div>
@@ -1483,9 +1533,7 @@ function GuardianView({ threats }: { threats: Threat[] }) {
                 key={i}
                 className={cn(
                   "text-sm rounded-lg px-3 py-2 whitespace-pre-wrap",
-                  m.role === "user"
-                    ? "bg-primary/10 text-foreground ml-10"
-                    : "bg-secondary/60 text-foreground mr-10",
+                  m.role === "user" ? "bg-primary/10 text-foreground ml-10" : "bg-secondary/60 text-foreground mr-10",
                 )}
               >
                 {m.content}
@@ -1512,10 +1560,10 @@ function GuardianView({ threats }: { threats: Threat[] }) {
               mode === "emergency"
                 ? "Describe what just happened…"
                 : mode === "threat"
-                ? "Ask about the selected alert…"
-                : mode === "all"
-                ? "Ask about your alerts…"
-                : "Ask a safety question…"
+                  ? "Ask about the selected alert…"
+                  : mode === "all"
+                    ? "Ask about your alerts…"
+                    : "Ask a safety question…"
             }
             disabled={sending}
             className="h-10"
