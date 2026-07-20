@@ -1387,6 +1387,103 @@ function ThreatRow({
 
 export default Index;
 
+function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
+  const downloadZip = (path: string, filename: string, browser: string, storeUrl: string) => {
+    fetch(path)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast.success(`${browser} extension downloaded`, {
+          description: `Unzip it, open ${storeUrl}, enable Developer mode, then click 'Load unpacked'.`,
+          duration: 9000,
+        });
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
+  const extensions = [
+    {
+      key: "chrome",
+      name: "Chrome extension",
+      description: "Warns you before loading dangerous URLs in Google Chrome.",
+      zip: "/trust-shield-extension.zip",
+      filename: "trust-shield-extension.zip",
+      browser: "Chrome",
+      storeUrl: "chrome://extensions",
+    },
+    {
+      key: "edge",
+      name: "Microsoft Edge extension",
+      description: "Warns you before loading dangerous URLs in Microsoft Edge.",
+      zip: "/trust-shield-edge.zip",
+      filename: "trust-shield-edge.zip",
+      browser: "Edge",
+      storeUrl: "edge://extensions",
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Puzzle className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">Extensions</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Download Trust Shield browser extensions to get warned before you load a dangerous URL.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {extensions.map((ext) => (
+          <Card key={ext.key}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                <Puzzle className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold">{ext.name}</h4>
+                <p className="text-xs text-muted-foreground mt-1">{ext.description}</p>
+                <button
+                  onClick={() => downloadZip(ext.zip, ext.filename, ext.browser, ext.storeUrl)}
+                  className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gradient-shield text-primary-foreground hover:opacity-90 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="font-medium">Download</span>
+                </button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card>
+        <p className="text-sm text-center text-muted-foreground">
+          Don't know how to install?{" "}
+          <button
+            type="button"
+            onClick={onAskGuardian}
+            className="underline text-primary hover:opacity-80 font-medium"
+          >
+            Ask Cyber Guardian!
+          </button>
+        </p>
+      </Card>
+    </div>
+  );
+}
+
 function GuardianView({ threats }: { threats: Threat[] }) {
   const activeThreats = threats.filter((t) => t.status === "active");
   const [mode, setMode] = useState<"all" | "emergency" | "threat" | "general">(
