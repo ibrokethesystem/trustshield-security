@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
     const threatId: string | undefined = body.threat_id;
     const mode: string = typeof body.mode === 'string' ? body.mode : (threatId ? 'threat' : 'general');
     const messages: Msg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
+    const vaultSummary = body.vault_summary && typeof body.vault_summary === 'object' ? body.vault_summary : null;
     if (messages.length === 0) return json({ error: 'Empty conversation' }, 400);
 
     const stringify = (v: unknown): string => {
@@ -98,6 +99,7 @@ ABOUT TRUST SHIELD (facts about this app — use these when the user asks what T
 - Threats list: confirmed threats appear on the dashboard. Each threat can be Dismissed (mark as false alarm/resolved) or Block source (mark as blocked so it stops counting as active). Neither literally severs a network connection — Trust Shield is a web app.
 - Scan history tab: shows every scan the user has run.
 - Cyber Guardian (that's you): an in-app AI assistant. There is a button on each threat row ("Ask Cyber Guardian") and a dedicated Cyber Guardian tab in the sidebar with modes: All alerts, One alert, Emergency, and Stay safe.
+- Passwords tab: Trust Shield has a "Passwords" tab in the sidebar with (a) a password strength checker that scores a typed password, shows entropy in bits and estimated offline crack time, and lists concrete tips, and (b) a local password reference vault where users can save label / username / password / notes. Vault entries are stored in the browser's localStorage ONLY — Trust Shield does not upload them to any server, and Cyber Guardian never sees the actual passwords. Only an anonymized COUNT of vault entries and how many are weak/okay/strong is shared with you. Always recommend a dedicated password manager (1Password, Bitwarden, iCloud Keychain, etc.) for real day-to-day password storage, plus 2FA. Good password guidance: 16+ characters, unique per account, prefer a passphrase of 4+ random words, avoid names/birthdays/dictionary words, never reuse across sites, enable 2FA (prefer app-based or hardware key over SMS), and rotate any password that appears in a breach.
 - Chrome extension: YES, Trust Shield ships a Chrome extension. It's downloadable from a "Download Chrome extension" button in the sidebar (public/trust-shield-extension.zip). Users unzip, open chrome://extensions, enable Developer mode, and Load unpacked. It warns before loading dangerous URLs using local heuristics (HTTPS, punycode, look-alike brand domains, suspicious TLDs, shorteners, risky paths) blended with VirusTotal's URL rating.
 - Edge extension: YES, Trust Shield also ships a Microsoft Edge extension (public/trust-shield-edge.zip), downloadable from the "Edge extension" button in the sidebar. It uses the same MV3 code and heuristics as the Chrome extension.
 - How to install the Chrome extension (walk the user through this if they ask): 1) Click "Chrome extension" in the Trust Shield sidebar to download trust-shield-extension.zip. 2) Unzip the file. 3) Open chrome://extensions in Chrome. 4) Toggle "Developer mode" ON in the top-right. 5) Click "Load unpacked" and select the unzipped folder. 6) Pin Trust Shield from the Extensions puzzle-piece menu. Done — Chrome will now warn before loading dangerous URLs.
@@ -112,8 +114,13 @@ ABOUT TRUST SHIELD (facts about this app — use these when the user asks what T
 CONTEXT:
 ${context}`;
 
+    const vaultBlock = vaultSummary
+      ? `\n\nUSER'S LOCAL PASSWORD VAULT (counts only, no passwords):\n- Saved entries: ${vaultSummary.count ?? 0}\n- Weak or very weak: ${vaultSummary.weak ?? 0}\n- Okay: ${vaultSummary.okay ?? 0}\n- Strong: ${vaultSummary.strong ?? 0}\nIf any are weak, gently suggest upgrading those specific ones and moving them into a real password manager. Never ask the user to paste actual passwords into the chat.`
+      : '';
+    const finalSystemPrompt = systemPrompt + vaultBlock;
+
     const chatMessages = [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: finalSystemPrompt },
       ...messages.map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) })),
     ];
 
