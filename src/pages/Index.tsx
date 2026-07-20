@@ -86,11 +86,12 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian";
+type ViewKey = "dashboard" | "history" | "guardian" | "malware";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "history", label: "Scan history", icon: History },
+  { key: "malware", label: "Malware detectors", icon: ShieldCheck },
 ];
 
 const severityStyles: Record<Threat["severity"], string> = {
@@ -869,8 +870,10 @@ const Index = () => {
               toast.success("Scan history cleared");
             }}
           />
-        ) : (
+        ) : view === "guardian" ? (
           <GuardianView threats={threats ?? []} />
+        ) : (
+          <MalwareDetectorsView />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
