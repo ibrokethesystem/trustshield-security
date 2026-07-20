@@ -421,11 +421,115 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
 
       {/* Vault */}
       <div className="rounded-xl border border-border/60 bg-card/50 p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium flex items-center gap-2"><Lock className="h-4 w-4 text-primary" /> Password reference vault</h3>
-          <span className="text-xs text-muted-foreground">{entries.length} saved · local only</span>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="font-medium flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary" /> Password reference vault
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {userId ? (
+              <span className="inline-flex items-center gap-1"><Cloud className="h-3.5 w-3.5" /> Synced to your account</span>
+            ) : (
+              <span>Local only — sign in to sync</span>
+            )}
+            <span>· {entries.length} saved</span>
+          </div>
         </div>
 
+        {/* Lock controls */}
+        {userId && (
+          <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 p-3 flex-wrap gap-2">
+            <div className="text-sm flex items-center gap-2">
+              {lockEnabled ? <LockKeyhole className="h-4 w-4 text-primary" /> : <Unlock className="h-4 w-4 text-muted-foreground" />}
+              <div>
+                <div className="font-medium">
+                  {lockEnabled ? (unlocked ? "Vault unlocked" : "Vault locked") : "Vault lock is off"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {lockEnabled
+                    ? "Requires your unlock code or fingerprint before showing saved passwords."
+                    : "Turn on a lock so a code or fingerprint is required to open the vault."}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {!lockEnabled ? (
+                <Button size="sm" onClick={() => setSetupOpen(true)}><LockKeyhole className="h-3.5 w-3.5 mr-1" /> Turn on lock</Button>
+              ) : (
+                <>
+                  {unlocked && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setUnlocked(false)}>Lock now</Button>
+                      {isWebAuthnSupported() && !fingerprintReady && (
+                        <Button size="sm" variant="outline" onClick={enrollFingerprintNow}>
+                          <Fingerprint className="h-3.5 w-3.5 mr-1" /> Add fingerprint on this device
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={disableLock} disabled={busy}>Remove lock</Button>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Setup lock dialog (inline) */}
+        {setupOpen && (
+          <div className="rounded-lg border border-primary/40 bg-card p-4 space-y-3">
+            <div className="font-medium flex items-center gap-2"><LockKeyhole className="h-4 w-4 text-primary" /> Set a vault unlock code</div>
+            <p className="text-xs text-muted-foreground">You'll enter this code (or use your fingerprint on supported devices) each time you open the vault. Choose something you can remember — it can't be recovered if lost.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Unlock code</Label>
+                <Input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="At least 4 characters" />
+              </div>
+              <div>
+                <Label className="text-xs">Confirm code</Label>
+                <Input type="password" value={newPin2} onChange={(e) => setNewPin2(e.target.value)} placeholder="Repeat" />
+              </div>
+            </div>
+            {isWebAuthnSupported() && (
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={enrollFinger} onChange={(e) => setEnrollFinger(e.target.checked)} />
+                <Fingerprint className="h-4 w-4" /> Also enroll fingerprint / device biometrics on this device
+              </label>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => { setSetupOpen(false); setNewPin(""); setNewPin2(""); }}>Cancel</Button>
+              <Button size="sm" onClick={enableLock} disabled={busy}>
+                {busy && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />} Enable lock
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Lock gate */}
+        {userId && lockEnabled && !unlocked ? (
+          <div className="rounded-lg border border-border/60 bg-muted/10 p-6 text-center space-y-4">
+            <LockKeyhole className="h-8 w-8 mx-auto text-primary" />
+            <div>
+              <div className="font-medium">Vault is locked</div>
+              <div className="text-xs text-muted-foreground">Enter your unlock code {fingerprintReady ? "or use your fingerprint" : ""} to view saved passwords.</div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+              <Input
+                type="password"
+                value={unlockPin}
+                onChange={(e) => setUnlockPin(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") tryUnlockPin(); }}
+                placeholder="Unlock code"
+                autoFocus
+              />
+              <Button onClick={tryUnlockPin}>Unlock</Button>
+            </div>
+            {fingerprintReady && (
+              <Button variant="outline" onClick={tryUnlockFingerprint} className="gap-2">
+                <Fingerprint className="h-4 w-4" /> Use fingerprint
+              </Button>
+            )}
+          </div>
+        ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label className="text-xs">Label</Label>
@@ -446,8 +550,10 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
         </div>
         <Button onClick={add} className="gap-2"><Plus className="h-4 w-4" /> Save to vault</Button>
 
-        {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground pt-2">Nothing saved yet. Entries stay on this device only.</p>
+        {loading ? (
+          <p className="text-sm text-muted-foreground pt-2 flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading vault…</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground pt-2">Nothing saved yet.</p>
         ) : (
           <ul className="divide-y divide-border/60 pt-2">
             {entries.map((e) => {
@@ -480,9 +586,13 @@ export default function PasswordsView({ userId }: { userId: string | undefined }
             })}
           </ul>
         )}
+        </>
+        )}
 
         <div className="text-xs text-muted-foreground bg-muted/30 border border-border/40 rounded-lg p-3">
-          Vault entries are saved in this browser's local storage only. They are never uploaded to Trust Shield's servers or shared with Cyber Guardian. Clear your browser data to remove them.
+          {userId
+            ? "Vault entries sync securely to your Trust Shield account so they appear on every device you sign in to. Cyber Guardian only sees anonymized counts, never the passwords themselves."
+            : "Sign in to sync your vault across devices. Until then, entries stay in this browser only."}
         </div>
       </div>
     </section>
