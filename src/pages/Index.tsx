@@ -677,6 +677,7 @@ const Index = () => {
             </div>
 
             {/* Trend chart */}
+            <div className="max-w-2xl">
             <Card>
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -725,6 +726,7 @@ const Index = () => {
                 </ResponsiveContainer>
               </div>
             </Card>
+            </div>
 
             {/* Scanner + Threat Radar */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
