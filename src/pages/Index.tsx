@@ -1123,11 +1123,18 @@ function ShareDialog({
             className="gap-2"
             onClick={() =>
               open_(
-                `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+                `https://mail.google.com/mail/u/0/?view=cm&fs=1&tf=cm&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
               )
             }
           >
-            <Mail className="w-4 h-4" /> Gmail
+            <Mail className="w-4 h-4" /> Gmail (compose)
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => open_("https://mail.google.com/")}
+          >
+            <Mail className="w-4 h-4" /> Open Gmail
           </Button>
           <Button
             variant="outline"
