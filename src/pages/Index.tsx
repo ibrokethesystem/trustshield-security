@@ -820,7 +820,7 @@ const Index = () => {
                 </Button>
               </div>
             </Card>
-            <ThreatRadarView userId={user?.id} compact />
+            <ThreatRadarView userId={user?.id} />
             </div>
 
             {/* Threats list */}
