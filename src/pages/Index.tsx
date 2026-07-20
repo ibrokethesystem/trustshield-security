@@ -930,9 +930,22 @@ const Index = () => {
         ) : view === "network" ? (
           <NetworkScanView />
         ) : view === "extensions" ? (
-          <ExtensionsView onAskGuardian={() => setView("guardian")} />
+          <ExtensionsView
+            onAskGuardian={(browser) => {
+              if (browser) {
+                setGuardianPrefill(
+                  `How can I install the Trust Shield ${browser} extension?`,
+                );
+              }
+              setView("guardian");
+            }}
+          />
         ) : (
-          <GuardianView threats={threats ?? []} />
+          <GuardianView
+            threats={threats ?? []}
+            prefill={guardianPrefill}
+            onPrefillConsumed={() => setGuardianPrefill("")}
+          />
         )}
 
         <footer className="text-xs text-muted-foreground pb-6">
