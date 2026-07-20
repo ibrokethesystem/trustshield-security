@@ -37,6 +37,7 @@ import {
   Copy,
   MessageSquare,
   KeyRound,
+  Radar,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
+import ThreatRadarView from "@/components/ThreatRadarView";
 
 type Threat = {
   id: string;
@@ -93,13 +95,14 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "radar";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
+  { key: "radar", label: "Threat Radar", icon: Radar },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
