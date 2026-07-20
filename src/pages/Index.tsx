@@ -1112,74 +1112,8 @@ function ShareDialog({
           {body}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {canNativeShare && (
-            <Button onClick={nativeShare} className="gap-2 col-span-2 bg-gradient-shield hover:opacity-90">
-              <Share2 className="w-4 h-4" /> Share via device…
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() =>
-              open_(
-                `https://mail.google.com/mail/u/0/?view=cm&fs=1&tf=cm&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
-              )
-            }
-          >
-            <Mail className="w-4 h-4" /> Gmail (compose)
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => open_("https://mail.google.com/mail/u/0/#inbox")}
-          >
-            <Mail className="w-4 h-4" /> Open Gmail
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => open_(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)}
-          >
-            <Mail className="w-4 h-4" /> Email app
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => open_(`sms:?&body=${encodeURIComponent(body)}`)}
-          >
-            <MessageSquare className="w-4 h-4" /> Messages / SMS
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() => open_(`https://wa.me/?text=${encodeURIComponent(body)}`)}
-          >
-            <MessageSquare className="w-4 h-4" /> WhatsApp
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() =>
-              open_(
-                `https://twitter.com/intent/tweet?text=${encodeURIComponent(body)}`,
-              )
-            }
-          >
-            <Send className="w-4 h-4" /> X / Twitter
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() =>
-              open_(
-                `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(body)}`,
-              )
-            }
-          >
-            <Users className="w-4 h-4" /> Facebook
-          </Button>
-          <Button variant="outline" className="gap-2 col-span-2" onClick={copyLink}>
+        <div className="grid grid-cols-1 gap-2">
+          <Button variant="outline" className="gap-2" onClick={copyLink}>
             <Copy className="w-4 h-4" /> Copy message + link
           </Button>
         </div>
