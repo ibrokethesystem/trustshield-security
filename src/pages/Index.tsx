@@ -1407,7 +1407,11 @@ function ThreatRow({
 
 export default Index;
 
-function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
+function ExtensionsView({
+  onAskGuardian,
+}: {
+  onAskGuardian: (browser?: "Chrome" | "Edge") => void;
+}) {
   const downloadZip = (path: string, filename: string, browser: string, storeUrl: string) => {
     fetch(path)
       .then((res) => {
@@ -1490,10 +1494,29 @@ function ExtensionsView({ onAskGuardian }: { onAskGuardian: () => void }) {
 
       <Card>
         <p className="text-sm text-center text-muted-foreground">
-          Don't know how to install?{" "}
+          Don't know how to install the{" "}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="underline text-primary hover:opacity-80 font-medium"
+              >
+                choose extension
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center">
+              <DropdownMenuItem onClick={() => onAskGuardian("Chrome")}>
+                Chrome
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onAskGuardian("Edge")}>
+                Edge
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          ? {" "}
           <button
             type="button"
-            onClick={onAskGuardian}
+            onClick={() => onAskGuardian()}
             className="underline text-primary hover:opacity-80 font-medium"
           >
             Ask Cyber Guardian!
