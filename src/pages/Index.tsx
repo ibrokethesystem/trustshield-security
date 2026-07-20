@@ -32,7 +32,6 @@ import {
   History,
   Download,
   FileScan,
-  RefreshCw,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -625,35 +624,6 @@ const Index = () => {
           Warns you before loading dangerous URLs in Chrome.
         </p>
 
-        <button
-          onClick={() => {
-            fetch("/trust-shield-safari.zip")
-              .then((res) => {
-                if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-                return res.blob();
-              })
-              .then((blob) => {
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = "trust-shield-safari.zip";
-                a.click();
-                URL.revokeObjectURL(a.href);
-                toast.success("Safari extension downloaded", {
-                  description: "Unzip, then in Terminal run: xcrun safari-web-extension-converter <folder>. Open the generated Xcode project, press Cmd+R, then enable Trust Shield in Safari → Settings → Extensions. Full steps in README.txt.",
-                  duration: 12000,
-                });
-              })
-              .catch((err) => toast.error(err.message));
-          }}
-          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm border border-primary/40 text-foreground hover:bg-secondary/60 transition"
-        >
-          <Download className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">Safari extension</span>
-        </button>
-        <p className="px-3 mt-1 text-[11px] text-muted-foreground leading-snug">
-          Same protection for Safari. Requires macOS + Xcode to install (one-command wrap).
-        </p>
-
         {!appInstalled && (
           <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
             <div className="flex items-center gap-2 mb-1">
@@ -686,43 +656,6 @@ const Index = () => {
             )}
           </div>
         )}
-
-        <button
-          onClick={async () => {
-            const tid = toast.loading("Checking for updates…");
-            try {
-              if ("serviceWorker" in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(regs.map((r) => r.update()));
-              }
-              const res = await fetch(window.location.href, { cache: "no-store" });
-              const html = await res.text();
-              const match = html.match(/\/assets\/index-[^"']+\.js/);
-              const currentScripts = Array.from(document.querySelectorAll("script[src]"))
-                .map((s) => (s as HTMLScriptElement).src);
-              const hasNew = match ? !currentScripts.some((s) => s.includes(match[0])) : false;
-              toast.dismiss(tid);
-              if (hasNew) {
-                toast.success("Update available", {
-                  description: "Reloading to apply the latest version…",
-                  duration: 3000,
-                });
-                setTimeout(() => window.location.reload(), 1200);
-              } else {
-                toast.success("You're up to date", {
-                  description: "Trust Shield is running the latest version.",
-                });
-              }
-            } catch {
-              toast.dismiss(tid);
-              toast.error("Could not check for updates");
-            }
-          }}
-          className="mt-3 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-secondary text-foreground hover:bg-secondary/80 border border-border transition"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span className="flex-1 text-left font-medium">Check for updates</span>
-        </button>
 
         <div className="mt-auto bg-card border border-border rounded-xl p-3 flex items-center gap-2">
           <button
@@ -1689,7 +1622,12 @@ function NetworkScanView() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [https, setHttps] = useState<boolean>(typeof window !== "undefined" && window.location.protocol === "https:");
-  const [connInfo, setConnInfo] = useState<{ type?: string; effectiveType?: string; downlink?: number; rtt?: number } | null>(null);
+  const [connInfo, setConnInfo] = useState<{
+    type?: string;
+    effectiveType?: string;
+    downlink?: number;
+    rtt?: number;
+  } | null>(null);
 
   useEffect(() => {
     setHttps(window.location.protocol === "https:");
@@ -1709,11 +1647,26 @@ function NetworkScanView() {
       setResult(data);
       const verdict = (data as any)?.verdict;
       if (verdict === "unsafe") {
-        toast.error("Network flagged as unsafe", { description: "See details below.", duration: 8000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+        toast.error("Network flagged as unsafe", {
+          description: "See details below.",
+          duration: 8000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
       } else if (verdict === "caution") {
-        toast.warning("Proceed with caution", { description: "Some risk signals on your network.", duration: 8000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+        toast.warning("Proceed with caution", {
+          description: "Some risk signals on your network.",
+          duration: 8000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
       } else {
-        toast.success("Network looks safe", { description: "No malicious signals detected.", duration: 6000, position: "bottom-left", className: "trust-bottom-toast text-base" });
+        toast.success("Network looks safe", {
+          description: "No malicious signals detected.",
+          duration: 6000,
+          position: "bottom-left",
+          className: "trust-bottom-toast text-base",
+        });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Scan failed";
@@ -1740,19 +1693,27 @@ function NetworkScanView() {
               <Wifi className="w-5 h-5 text-primary" /> Network safety scan
             </h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-              Checks your current internet path — your public IP's reputation, ISP, geolocation, and whether it's a known
-              VPN, proxy, or malicious host. Note: browsers can't see your Wi-Fi's SSID, encryption, or signal — this
-              scans the network you're going through, not the Wi-Fi radio itself.
+              Checks your current internet path — your public IP's reputation, ISP, geolocation, and whether it's a
+              known VPN, proxy, or malicious host. Note: browsers can't see your Wi-Fi's SSID, encryption, or signal —
+              this scans the network you're going through, not the Wi-Fi radio itself.
             </p>
           </div>
-          <Button onClick={runScan} disabled={loading} className="bg-gradient-shield hover:opacity-90 glow-shield gap-2 shrink-0">
+          <Button
+            onClick={runScan}
+            disabled={loading}
+            className="bg-gradient-shield hover:opacity-90 glow-shield gap-2 shrink-0"
+          >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
             {loading ? "Scanning…" : "Scan network"}
           </Button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-4">
-          <MiniInfo label="Page transport" value={https ? "HTTPS ✓" : "HTTP (insecure)"} tone={https ? "good" : "bad"} />
+          <MiniInfo
+            label="Page transport"
+            value={https ? "HTTPS ✓" : "HTTP (insecure)"}
+            tone={https ? "good" : "bad"}
+          />
           {connInfo?.effectiveType && (
             <MiniInfo label="Connection quality" value={connInfo.effectiveType.toUpperCase()} />
           )}
@@ -1804,7 +1765,9 @@ function NetworkScanView() {
 
           {result.geo && (
             <div className="mb-4">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Location & ISP</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Location & ISP
+              </p>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {result.geo.city && <MiniInfo label="City" value={result.geo.city} />}
                 {result.geo.region && <MiniInfo label="Region" value={result.geo.region} />}
@@ -1821,8 +1784,16 @@ function NetworkScanView() {
                 VirusTotal reputation
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <MiniInfo label="Malicious" value={result.virustotal.malicious} tone={result.virustotal.malicious > 0 ? "bad" : undefined} />
-                <MiniInfo label="Suspicious" value={result.virustotal.suspicious} tone={result.virustotal.suspicious > 0 ? "warn" : undefined} />
+                <MiniInfo
+                  label="Malicious"
+                  value={result.virustotal.malicious}
+                  tone={result.virustotal.malicious > 0 ? "bad" : undefined}
+                />
+                <MiniInfo
+                  label="Suspicious"
+                  value={result.virustotal.suspicious}
+                  tone={result.virustotal.suspicious > 0 ? "warn" : undefined}
+                />
                 <MiniInfo label="Harmless" value={result.virustotal.harmless} />
                 <MiniInfo label="Undetected" value={result.virustotal.undetected} />
               </div>
@@ -1836,8 +1807,8 @@ function NetworkScanView() {
         <p className="text-xs text-muted-foreground leading-relaxed">
           Browsers don't expose your Wi-Fi's name, password strength, WPA2/WPA3 encryption, or nearby devices — those
           require a native OS-level scanner. For full Wi-Fi audits, use your router admin page (usually{" "}
-          <span className="font-mono">192.168.1.1</span>) and confirm: WPA3 or WPA2 with a strong password, firmware
-          up to date, remote admin disabled, and guest network isolated.
+          <span className="font-mono">192.168.1.1</span>) and confirm: WPA3 or WPA2 with a strong password, firmware up
+          to date, remote admin disabled, and guest network isolated.
         </p>
       </Card>
     </div>
