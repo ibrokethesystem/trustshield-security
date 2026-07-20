@@ -86,9 +86,10 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history";
+type ViewKey = "dashboard" | "history" | "guardian";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "history", label: "Scan history", icon: History },
 ];
 
