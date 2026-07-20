@@ -1513,14 +1513,7 @@ function ExtensionsView({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          ? {" "}
-          <button
-            type="button"
-            onClick={() => onAskGuardian()}
-            className="underline text-primary hover:opacity-80 font-medium"
-          >
-            Ask Cyber Guardian!
-          </button>
+          ? Ask Cyber Guardian!
         </p>
       </Card>
     </div>
