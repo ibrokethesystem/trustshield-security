@@ -61,7 +61,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
-import PasswordsView, { analyzePassword } from "@/components/PasswordsView";
+import PasswordsView from "@/components/PasswordsView";
 
 type Threat = {
   id: string;
