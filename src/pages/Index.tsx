@@ -166,6 +166,7 @@ const Index = () => {
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
   const [fileScanning, setFileScanning] = useState(false);
 
