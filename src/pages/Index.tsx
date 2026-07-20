@@ -59,6 +59,7 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
 
 type Threat = {
   id: string;
