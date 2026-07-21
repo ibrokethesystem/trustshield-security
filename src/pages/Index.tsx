@@ -69,6 +69,7 @@ import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { childEmailFor } from "@/lib/childAuth";
+import { ChildMonitoring } from "@/components/ChildMonitoring";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1523,6 +1524,7 @@ const Index = () => {
           <FamilyView
             alerts={familyAlerts}
             parentEmail={(user?.email ?? "").toLowerCase()}
+            parentUserId={user?.id}
             onRefresh={loadFamilyAlerts}
             onClear={() => {
               if (!user) return;
