@@ -89,6 +89,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.2",
+    version: "2.0.2",
+    name: "Parents can turn CyberEdu off",
+    date: "2026-07-21",
+    summary:
+      "Parents can now hide the CyberEdu tab from a linked child's sidebar. From Family → the selected child card, tap \"Turn CyberEdu off\" and the lessons and minigames disappear from that child's account until you turn it back on. The child's CyberEdu progress is preserved.",
+  },
+  {
     id: "2.0.1",
     version: "2.0.1",
     name: "Unblock reasons & polish",
