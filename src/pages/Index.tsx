@@ -876,6 +876,16 @@ const Index = () => {
       toast.error("Sign in first");
       return;
     }
+    const labelRaw = childName.trim();
+    if (!labelRaw) {
+      toast.error("Give this child a name so you can add more later");
+      return;
+    }
+    const label = childLabelSlug(labelRaw);
+    if (!label) {
+      toast.error("Please use letters or numbers in the child's name");
+      return;
+    }
     if (childPassword.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -889,14 +899,29 @@ const Index = () => {
     const { data: parentSessionData } = await supabase.auth.getSession();
     const parentSession = parentSessionData.session;
     const parentEmailLower = user.email.toLowerCase();
-    const email = await childEmailFor(parentEmailLower);
+    // Prevent duplicate labels for the same parent.
+    try {
+      const { data: existingLabels } = await supabase
+        .from("child_links")
+        .select("label")
+        .eq("parent_id", user.id)
+        .is("deleted_at", null);
+      if ((existingLabels ?? []).some((r) => (r.label ?? "").toLowerCase() === label)) {
+        toast.error("You already have a child with that name", {
+          description: "Pick a different name (or password + name pair) for this child.",
+        });
+        setChildBusy(false);
+        return;
+      }
+    } catch { /* non-fatal */ }
+    const email = await childEmailFor(parentEmailLower, label);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: childPassword,
         options: {
           emailRedirectTo: window.location.origin,
-          data: { role: "child", parent_email: parentEmailLower },
+          data: { role: "child", parent_email: parentEmailLower, child_label: label, child_name: labelRaw },
         },
       });
       if (error) {
@@ -909,11 +934,11 @@ const Index = () => {
         if (siErr) {
           // Password differs — sign in with a temporary reset isn't available client-side; ask parent to use existing password.
           throw new Error(
-            "A child account already exists for this parent email. Sign in on the child's device using the password you set previously, or contact support to reset it."
+            `A child account with name "${labelRaw}" already exists for this parent email. Either pick a different name, or sign in on that child's device using the password you set previously.`
           );
         }
         await supabase.auth.updateUser({
-          data: { role: "child", parent_email: parentEmailLower },
+          data: { role: "child", parent_email: parentEmailLower, child_label: label, child_name: labelRaw },
         });
         if (parentSession) {
           await supabase.auth.setSession({
@@ -926,6 +951,7 @@ const Index = () => {
         });
         setChildPassword("");
         setChildPasswordConfirm("");
+        setChildName("");
         setChildDialogOpen(false);
         setChildBusy(false);
         return;
@@ -955,7 +981,7 @@ const Index = () => {
           await supabase
             .from("child_links")
             .upsert(
-              { parent_id: user.id, child_id: childId, child_email: email },
+              { parent_id: user.id, child_id: childId, child_email: email, label },
               { onConflict: "child_id" },
             );
         } catch { /* non-fatal */ }
@@ -964,11 +990,12 @@ const Index = () => {
       localStorage.setItem(`ts_role_${user.id}`, "parent");
       localStorage.setItem("ts_role", "parent");
       setRole("parent");
-      toast.success("Child account created", {
-        description: `On the child's device, choose "Child" on the login page and sign in with your email (${parentEmailLower}) and the password you just set.`,
+      toast.success(`Child account created for ${labelRaw}`, {
+        description: `On the child's device, choose "Child" on the login page and sign in with your email (${parentEmailLower}), the name "${labelRaw}", and the password you just set.`,
       });
       setChildPassword("");
       setChildPasswordConfirm("");
+      setChildName("");
       setChildDialogOpen(false);
     } catch (err) {
       // Best-effort restore of parent session on failure.
