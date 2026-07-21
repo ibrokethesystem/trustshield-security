@@ -1370,6 +1370,36 @@ const Index = () => {
       </main>
 
       {/* Profile dialog */}
+      <Dialog open={childDialogOpen} onOpenChange={(o) => !childBusy && setChildDialogOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up child account</DialogTitle>
+            <DialogDescription>
+              We'll sign you out and open Google so your child can sign in with their own Google account.
+              Their new account will be linked to yours ({user?.email}) — their alerts appear in your Family tab,
+              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
+            Pick your child's Google account on the next screen. When it finishes, sign back in with your own
+            Google account (or email/password) to see their alerts in the Family tab.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChildDialogOpen(false)} disabled={childBusy}>
+              Cancel
+            </Button>
+            <Button
+              onClick={startChildSignup}
+              disabled={childBusy}
+              className="bg-gradient-shield hover:opacity-90 glow-shield"
+            >
+              {childBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+              Continue with Google
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent>
           <DialogHeader>
