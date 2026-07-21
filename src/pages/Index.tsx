@@ -1947,7 +1947,7 @@ function MyParentView({
   const [pwd, setPwd] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [siblings, setSiblings] = useState<{ child_id: string; child_email: string; label: string | null }[]>([]);
+  const [siblings, setSiblings] = useState<{ child_id: string; label: string | null }[]>([]);
   const [requests, setRequests] = useState<
     { id: string; kind: string; status: string; created_at: string; resolved_at: string | null; note: string | null }[]
   >([]);
@@ -1956,8 +1956,9 @@ function MyParentView({
 
   const loadSiblings = useCallback(async () => {
     if (!childUserId) return;
-    const { data } = await supabase.rpc("get_siblings", { _child: childUserId });
-    setSiblings((data ?? []) as { child_id: string; child_email: string; label: string | null }[]);
+    const { data } = await supabase.functions.invoke("list-siblings", { body: {} });
+    const rows = (data?.siblings ?? []) as { sibling_id: string; sibling_label: string | null }[];
+    setSiblings(rows.map((r) => ({ child_id: r.sibling_id, label: r.sibling_label })));
   }, [childUserId]);
 
   const loadRequests = useCallback(async () => {
@@ -2131,7 +2132,6 @@ function MyParentView({
                     <span className="font-medium">
                       {s.label ? s.label.replace(/-/g, " ") : "Sibling"}
                     </span>
-                    <span className="text-[11px] text-muted-foreground break-all">({s.child_email})</span>
                   </li>
                 ))}
               </ul>
