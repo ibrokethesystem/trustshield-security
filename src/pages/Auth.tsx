@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { childEmailFor, childLabelSlug } from "@/lib/childAuth";
+import { childEmailFor } from "@/lib/childAuth";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -18,7 +18,6 @@ const Auth = () => {
   const [busy, setBusy] = useState(false);
   const [isChild, setIsChild] = useState(false);
   const [parentEmail, setParentEmail] = useState("");
-  const [childName, setChildName] = useState("");
 
   useEffect(() => {
     document.title = mode === "signup" ? "Sign up · Trust Shield" : "Sign in · Trust Shield";
@@ -44,13 +43,13 @@ const Auth = () => {
       if (isChild) {
         // Child sign-in only: the account was created by the parent from the dashboard.
         const pe = parentEmail.trim().toLowerCase();
-        const label = childLabelSlug(childName);
-        // Try the labelled email first (multi-child parents); fall back to
-        // the legacy no-label derivation so older single-child accounts
-        // created before names were required can still sign in.
-        const candidates = label
-          ? [await childEmailFor(pe, label)]
-          : [await childEmailFor(pe, ""), await childEmailFor(pe)];
+        // Try both the labelled ("") and legacy no-label derivations so any
+        // child account created under this parent can sign in with just the
+        // parent's email + the child's password.
+        const candidates = [
+          await childEmailFor(pe, ""),
+          await childEmailFor(pe),
+        ];
         let signedIn = false;
         let lastErr: unknown = null;
         for (const cand of candidates) {
@@ -61,7 +60,7 @@ const Auth = () => {
         if (!signedIn) {
           void lastErr;
           throw new Error(
-            "That parent email, child name, and password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
+            "That parent email and password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
           );
         }
         // If the parent soft-deleted this child (recycle bin), block sign-in.
@@ -220,21 +219,6 @@ const Auth = () => {
                   Ask your parent to set up your account from their dashboard, then sign in here with their email and
                   the password they chose.
                 </p>
-                <div className="mt-3">
-                  <Label htmlFor="child-name">Your name</Label>
-                  <Input
-                    id="child-name"
-                    type="text"
-                    value={childName}
-                    onChange={(e) => setChildName(e.target.value)}
-                    placeholder="e.g. Alex"
-                    className="bg-secondary border-border"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Ask your parent which name they used when they set up your account. Leave blank only if you're the
-                    only child on your parent's account.
-                  </p>
-                </div>
               </div>
             ) : (
               <div>
