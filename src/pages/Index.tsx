@@ -4198,6 +4198,35 @@ function FamilyView({
         </AlertDialogContent>
       </AlertDialog>
 
+      <Dialog open={!!renameOpen} onOpenChange={(o) => { if (!o) { setRenameOpen(null); setRenameValue(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename child</DialogTitle>
+            <DialogDescription>
+              This is just the label shown in your Family tab. The child's password and sign-in stay the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="rename-child">New name</Label>
+            <Input
+              id="rename-child"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="e.g. Alex"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRenameOpen(null); setRenameValue(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={submitRename} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
         <div className="mt-4 flex items-center justify-between">
           <div className="text-xs font-semibold text-muted-foreground">
             Recent child alerts ({alerts.length})
