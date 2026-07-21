@@ -316,6 +316,7 @@ const Index = () => {
   const [childBusy, setChildBusy] = useState(false);
   const [childPassword, setChildPassword] = useState("");
   const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
+  const [childName, setChildName] = useState("");
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
