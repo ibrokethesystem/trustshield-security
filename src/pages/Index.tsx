@@ -38,6 +38,7 @@ import {
   MessageSquare,
   KeyRound,
   QrCode,
+  GraduationCap,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -188,7 +189,17 @@ type ScanRecord = {
 };
 
 type Role = "solo" | "parent" | "child";
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr" | "family";
+type ViewKey =
+  | "dashboard"
+  | "history"
+  | "guardian"
+  | "network"
+  | "extensions"
+  | "passwords"
+  | "files"
+  | "qr"
+  | "family"
+  | "cyberedu";
 const navItems: {
   key: ViewKey;
   label: string;
@@ -196,10 +207,12 @@ const navItems: {
   minVersion?: string;
   hideForChild?: boolean;
   parentOnly?: boolean;
+  childOnly?: boolean;
 }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "family", label: "Family", icon: Users, parentOnly: true },
+  { key: "cyberedu", label: "CyberEdu", icon: GraduationCap, childOnly: true, minVersion: "2.0.0" },
   { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
   { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2", hideForChild: true },
   { key: "network", label: "Network safety", icon: Wifi, hideForChild: true },
