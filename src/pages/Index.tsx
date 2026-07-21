@@ -1495,17 +1495,10 @@ const Index = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div>
-              <Label htmlFor="child-email">Child's email</Label>
-              <Input
-                id="child-email"
-                type="email"
-                value={childEmail}
-                onChange={(e) => setChildEmail(e.target.value)}
-                placeholder="kid@example.com"
-                disabled={childBusy}
-                className="bg-secondary border-border"
-              />
+            <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
+              Your child will sign in on their device using <span className="text-foreground font-medium">{user?.email}</span> as
+              the parent email and the password you choose below. Trust Shield handles the actual account behind the scenes — no
+              extra email needed.
             </div>
             <div>
               <Label htmlFor="child-password">Choose a password</Label>
@@ -1532,8 +1525,7 @@ const Index = () => {
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              You'll stay signed in as the parent. On your child's device, open Trust Shield and log in with this
-              email and password.
+              You'll stay signed in as the parent.
             </p>
           </div>
           <DialogFooter>
