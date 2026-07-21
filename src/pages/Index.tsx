@@ -174,16 +174,25 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr";
-const navItems: { key: ViewKey; label: string; icon: React.ElementType; minVersion?: string }[] = [
+type Role = "solo" | "parent" | "child";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr" | "family";
+const navItems: {
+  key: ViewKey;
+  label: string;
+  icon: React.ElementType;
+  minVersion?: string;
+  hideForChild?: boolean;
+  parentOnly?: boolean;
+}[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
-  { key: "passwords", label: "Passwords", icon: KeyRound },
-  { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2" },
-  { key: "network", label: "Network safety", icon: Wifi },
+  { key: "family", label: "Family", icon: Users, parentOnly: true },
+  { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
+  { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2", hideForChild: true },
+  { key: "network", label: "Network safety", icon: Wifi, hideForChild: true },
   { key: "qr", label: "QR scanner", icon: QrCode, minVersion: "2.0.0" },
   { key: "history", label: "Scan history", icon: History },
-  { key: "extensions", label: "Extensions", icon: Puzzle },
+  { key: "extensions", label: "Extensions", icon: Puzzle, hideForChild: true },
 ];
 
 // Compare semver strings ("1.9.9" vs "2.0.0"). Module-level so NetworkScanView etc. can use it.
