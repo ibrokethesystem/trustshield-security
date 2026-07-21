@@ -200,7 +200,8 @@ type ViewKey =
   | "files"
   | "qr"
   | "family"
-  | "cyberedu";
+  | "cyberedu"
+  | "myparent";
 const navItems: {
   key: ViewKey;
   label: string;
@@ -214,6 +215,7 @@ const navItems: {
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "family", label: "Family", icon: Users, parentOnly: true },
   { key: "cyberedu", label: "CyberEdu", icon: GraduationCap, childOnly: true, minVersion: "2.0.0" },
+  { key: "myparent", label: "My parent", icon: User, childOnly: true, minVersion: "2.0.0" },
   { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
   { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2", hideForChild: true },
   { key: "network", label: "Network safety", icon: Wifi, hideForChild: true },
