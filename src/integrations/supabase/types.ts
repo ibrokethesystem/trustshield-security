@@ -67,18 +67,21 @@ export type Database = {
       }
       child_links: {
         Row: {
+          child_email: string | null
           child_id: string
           created_at: string
           id: string
           parent_id: string
         }
         Insert: {
+          child_email?: string | null
           child_id: string
           created_at?: string
           id?: string
           parent_id: string
         }
         Update: {
+          child_email?: string | null
           child_id?: string
           created_at?: string
           id?: string
