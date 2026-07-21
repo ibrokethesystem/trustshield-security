@@ -71,6 +71,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "1.9.9",
+    version: "1.9.9",
+    name: "Device scanner in Network safety",
+    date: "2026-07-21",
+    summary:
+      "Network safety now includes a Device scanner that discovers this device's local network address via WebRTC, infers your Wi-Fi subnet and likely router IP, and flags what browsers can and can't see about other devices on the LAN.",
+  },
+  {
     id: "1.9.8",
     version: "1.9.8",
     name: "Guardian knows the changelog",
