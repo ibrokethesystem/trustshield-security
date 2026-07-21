@@ -3232,19 +3232,41 @@ function FamilyView({
   });
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
+  const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
+  const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
+
+  const loadDeleted = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("child_links")
+      .select("child_id,child_email,deleted_at")
+      .eq("parent_id", parentUserId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    setDeletedChildren(
+      (data ?? [])
+        .filter((r): r is { child_id: string; child_email: string; deleted_at: string } =>
+          Boolean(r.child_email && r.deleted_at))
+        .map((r) => ({ child_id: r.child_id, child_email: r.child_email.toLowerCase(), deleted_at: r.deleted_at })),
+    );
+  }, [parentUserId]);
+
+  useEffect(() => { loadDeleted(); }, [loadDeleted]);
 
   const removeChild = async (childEmail: string) => {
-    // Permanently delete the child auth user (and all their data) via the
-    // family-remove-child edge function. This prevents anyone from signing back
-    // into that child account.
+    // Soft-delete: mark the child_links row as deleted so the child can't sign
+    // in and their data is hidden from the Family tab, but the parent can
+    // restore them from the "Deleted children" section.
+    const emailLower = childEmail.toLowerCase();
     try {
-      const { data, error } = await supabase.functions.invoke("family-remove-child", {
-        body: { child_email: childEmail },
-      });
-      const errMsg = (error as { message?: string } | null)?.message
-        ?? (data as { error?: string } | null)?.error;
-      if (errMsg) {
-        toast.error("Couldn't delete child account", { description: errMsg });
+      if (!parentUserId) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("child_links")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("parent_id", parentUserId)
+        .ilike("child_email", emailLower);
+      if (error) {
+        toast.error("Couldn't delete child account", { description: error.message });
         setConfirmRemove(null);
         return;
       }
@@ -3256,7 +3278,7 @@ function FamilyView({
       return;
     }
 
-    const next = children.filter((c) => c !== childEmail);
+    const next = children.filter((c) => c.toLowerCase() !== emailLower);
     setChildren(next);
     localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
     // Drop any pending alerts from that child on this device.
@@ -3264,89 +3286,107 @@ function FamilyView({
       const key = `ts_family_alerts_${parentEmail}`;
       const raw = JSON.parse(localStorage.getItem(key) || "[]");
       const filtered = Array.isArray(raw)
-        ? raw.filter((a: { child_email?: string }) => (a.child_email ?? "").toLowerCase() !== childEmail.toLowerCase())
+        ? raw.filter((a: { child_email?: string }) => (a.child_email ?? "").toLowerCase() !== emailLower)
         : [];
       localStorage.setItem(key, JSON.stringify(filtered));
     } catch {
       /* ignore */
     }
-    localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    localStorage.removeItem(`ts_child_parent_by_email_${emailLower}`);
     setConfirmRemove(null);
+    await loadDeleted();
     onRefresh();
-    onChildrenChange?.(next.length);
+    // Keep the parent's role as long as anyone (active OR deleted) exists,
+    // so they can still restore. We pass the combined count.
+    onChildrenChange?.(next.length + deletedChildren.length + 1);
     toast.success(`Deleted ${childEmail}`, {
-      description: "Their Trust Shield account, browsing history, and banned sites are gone.",
+      description: "Moved to Deleted children — you can restore them from the Family tab.",
     });
   };
 
   const removeAllChildren = async () => {
     setConfirmRemoveAll(false);
-    // Gather every child linked to this parent — both local state AND any
-    // rows in child_links that this device doesn't know about (e.g. added
-    // from another device). We rely on RLS + parent_id to scope to us.
-    const collected = new Set<string>(children.map((c) => c.toLowerCase()));
-    if (parentUserId) {
-      try {
-        const { data } = await supabase
-          .from("child_links")
-          .select("child_email")
-          .eq("parent_id", parentUserId);
-        (data ?? []).forEach((row: { child_email?: string | null }) => {
-          if (row.child_email) collected.add(row.child_email.toLowerCase());
-        });
-      } catch {
-        /* fall back to local-only list */
-      }
-    }
-    const list = Array.from(collected);
-    if (list.length === 0) {
+    if (!parentUserId) return;
+    if (children.length === 0) {
       toast("No child accounts linked to delete");
       return;
     }
-    let failed: string[] = [];
-    for (const childEmail of list) {
-      try {
-        const { data, error } = await supabase.functions.invoke("family-remove-child", {
-          body: { child_email: childEmail },
-        });
-        const errMsg = (error as { message?: string } | null)?.message
-          ?? (data as { error?: string } | null)?.error;
-        if (errMsg) {
-          failed.push(childEmail);
-          continue;
-        }
-      } catch {
-        failed.push(childEmail);
-        continue;
-      }
-      localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    const { error } = await supabase
+      .from("child_links")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    if (error) {
+      toast.error("Couldn't delete child accounts", { description: error.message });
+      return;
     }
-    const remaining = failed;
-    setChildren(remaining);
-    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(remaining));
+    children.forEach((c) => localStorage.removeItem(`ts_child_parent_by_email_${c.toLowerCase()}`));
+    setChildren([]);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify([]));
     // Clear all local family alerts for deleted children
     try {
       const key = `ts_family_alerts_${parentEmail}`;
-      const raw = JSON.parse(localStorage.getItem(key) || "[]");
-      const filtered = Array.isArray(raw)
-        ? raw.filter((a: { child_email?: string }) =>
-            remaining.some((r) => r.toLowerCase() === (a.child_email ?? "").toLowerCase()))
-        : [];
-      localStorage.setItem(key, JSON.stringify(filtered));
+      localStorage.setItem(key, "[]");
     } catch {
       /* ignore */
     }
+    await loadDeleted();
     onRefresh();
-    onChildrenChange?.(remaining.length);
-    if (failed.length === 0) {
-      toast.success("All child accounts deleted", {
-        description: "Every linked child account, their browsing history, and banned sites are gone.",
-      });
-    } else {
-      toast.error(`Couldn't delete ${failed.length} child account(s)`, {
-        description: failed.join(", "),
-      });
+    // Combined count > 0 keeps the parent as parent so they can restore.
+    onChildrenChange?.(deletedChildren.length + children.length);
+    toast.success("All child accounts deleted", {
+      description: "Moved to Deleted children — you can restore any of them below.",
+    });
+  };
+
+  const restoreChild = async (childEmail: string) => {
+    if (!parentUserId) return;
+    const emailLower = childEmail.toLowerCase();
+    const { error } = await supabase
+      .from("child_links")
+      .update({ deleted_at: null })
+      .eq("parent_id", parentUserId)
+      .ilike("child_email", emailLower);
+    if (error) {
+      toast.error("Couldn't restore child", { description: error.message });
+      return;
     }
+    const next = children.includes(emailLower) ? children : [...children, emailLower];
+    setChildren(next);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
+    localStorage.setItem(`ts_child_parent_by_email_${emailLower}`, parentEmail);
+    await loadDeleted();
+    onRefresh();
+    onChildrenChange?.(next.length + deletedChildren.length);
+    toast.success(`Restored ${emailLower}`, {
+      description: "They can sign in again with the password you set.",
+    });
+  };
+
+  const purgeChild = async (childEmail: string) => {
+    setConfirmPurge(null);
+    const emailLower = childEmail.toLowerCase();
+    try {
+      const { data, error } = await supabase.functions.invoke("family-remove-child", {
+        body: { child_email: emailLower },
+      });
+      const errMsg = (error as { message?: string } | null)?.message
+        ?? (data as { error?: string } | null)?.error;
+      if (errMsg) {
+        toast.error("Couldn't purge child account", { description: errMsg });
+        return;
+      }
+    } catch (e) {
+      toast.error("Couldn't purge child account", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      });
+      return;
+    }
+    setDeletedChildren((d) => d.filter((c) => c.child_email !== emailLower));
+    onChildrenChange?.(children.length + Math.max(0, deletedChildren.length - 1));
+    toast.success(`Purged ${emailLower}`, {
+      description: "Their account, browsing history, and banned sites are gone forever.",
+    });
   };
 
   const downloadChildExtension = () => {
