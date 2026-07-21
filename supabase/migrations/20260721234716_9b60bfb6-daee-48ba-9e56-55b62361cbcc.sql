@@ -1,0 +1,1 @@
+ALTER TABLE public.child_links ADD COLUMN IF NOT EXISTS edu_disabled boolean NOT NULL DEFAULT false;
