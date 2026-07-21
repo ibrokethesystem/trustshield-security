@@ -69,6 +69,16 @@ import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { childEmailFor } from "@/lib/childAuth";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
 
