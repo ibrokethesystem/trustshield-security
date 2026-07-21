@@ -2112,6 +2112,66 @@ function MyParentView({
       <Card>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Ban className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold">Ask a parent to unblock a site</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              If a website is blocked but you really need it for school or homework, ask your grown-up. They'll get
+              a note in their Family tab and can turn it back on for you.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] max-w-xl">
+          <Input
+            value={unblockUrl}
+            onChange={(e) => setUnblockUrl(e.target.value)}
+            placeholder="example.com or the full link"
+          />
+          <Button
+            size="sm"
+            disabled={reqBusy || !childUserId || !unblockUrl.trim()}
+            onClick={submitUnblock}
+          >
+            <Send className="w-3.5 h-3.5 mr-1" />
+            Ask my grown-up
+          </Button>
+        </div>
+        {(() => {
+          const unblockReqs = requests.filter((r) => r.kind === "unblock_site").slice(0, 6);
+          if (unblockReqs.length === 0) return null;
+          return (
+            <div className="mt-4">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+                Your unblock requests
+              </div>
+              <ul className="space-y-1.5 text-xs">
+                {unblockReqs.map((r) => (
+                  <li
+                    key={r.id}
+                    className="p-2 rounded-md border border-border bg-secondary/40 flex items-center justify-between gap-2 flex-wrap"
+                  >
+                    <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider ${statusBadge(r.status)}`}
+                    >
+                      {r.status === "approved"
+                        ? "Approved"
+                        : r.status === "denied"
+                        ? "Said no"
+                        : "Waiting"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
             <Puzzle className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1">
@@ -2122,7 +2182,6 @@ function MyParentView({
             </p>
           </div>
         </div>
-        {/* placeholder for below */}
         <div className="mt-3 flex items-center gap-2 flex-wrap">
           {removalReq ? (
             <span
