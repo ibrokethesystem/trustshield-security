@@ -1457,33 +1457,64 @@ const Index = () => {
           <DialogHeader>
             <DialogTitle>Set up child account</DialogTitle>
             <DialogDescription>
-              We'll sign you out and open Google so your child can sign in with their own Google account.
-              Their new account will be linked to yours ({user?.email}) — their alerts appear in your Family tab,
-              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+              Create your child's Trust Shield account right now. You choose the password, then sign in on their
+              device with it. Their account will be linked to yours ({user?.email}) — alerts appear in your Family
+              tab, and Passwords, File scanner, Network safety, and Extensions are hidden from them.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
-            Pick your child's Google account on the next screen. When it finishes, sign back in with your own
-            Google account (or email/password) to see their alerts in the Family tab.
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="child-email">Child's email</Label>
+              <Input
+                id="child-email"
+                type="email"
+                value={childEmail}
+                onChange={(e) => setChildEmail(e.target.value)}
+                placeholder="kid@example.com"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div>
+              <Label htmlFor="child-password">Choose a password</Label>
+              <Input
+                id="child-password"
+                type="password"
+                value={childPassword}
+                onChange={(e) => setChildPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div>
+              <Label htmlFor="child-password-confirm">Confirm password</Label>
+              <Input
+                id="child-password-confirm"
+                type="password"
+                value={childPasswordConfirm}
+                onChange={(e) => setChildPasswordConfirm(e.target.value)}
+                placeholder="Re-enter password"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You'll stay signed in as the parent. On your child's device, open Trust Shield and log in with this
+              email and password.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setChildDialogOpen(false)} disabled={childBusy}>
               Cancel
             </Button>
             <Button
-              variant="outline"
-              onClick={startChildEmailSignup}
-              disabled={childBusy}
-            >
-              Use email instead
-            </Button>
-            <Button
-              onClick={startChildSignup}
+              onClick={createChildAccount}
               disabled={childBusy}
               className="bg-gradient-shield hover:opacity-90 glow-shield"
             >
               {childBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
-              Continue with Google
+              Create child account
             </Button>
           </DialogFooter>
         </DialogContent>
