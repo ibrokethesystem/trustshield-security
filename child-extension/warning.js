@@ -68,8 +68,27 @@ async function getChildSession() {
 }
 
 document.getElementById("askPerm").addEventListener("click", async () => {
-  const btn = document.getElementById("askPerm");
+  // Show the reason textarea instead of sending immediately.
+  document.getElementById("reasonWrap").style.display = "block";
+  document.getElementById("askPerm").style.display = "none";
+  document.getElementById("reason").focus();
+});
+
+document.getElementById("cancelReason").addEventListener("click", () => {
+  document.getElementById("reasonWrap").style.display = "none";
+  document.getElementById("askPerm").style.display = "";
+  document.getElementById("askStatus").textContent = "";
+});
+
+document.getElementById("sendReason").addEventListener("click", async () => {
+  const btn = document.getElementById("sendReason");
   const status = document.getElementById("askStatus");
+  const reason = (document.getElementById("reason").value || "").trim();
+  if (!reason) {
+    status.style.color = "#fca5a5";
+    status.textContent = "Please tell your parent why you want to visit this site.";
+    return;
+  }
   btn.disabled = true;
   status.style.color = "#fca5a5";
   status.textContent = "Sending request to your parent…";
@@ -110,7 +129,9 @@ document.getElementById("askPerm").addEventListener("click", async () => {
         parent_id,
         child_id: s.user_id,
         kind: "unblock_site",
-        note: host,
+        // First line = host (parent side parses it as the site to unblock).
+        // Remaining lines = the child's reason.
+        note: `${host}\n${reason}`,
         status: "pending",
       }),
     });

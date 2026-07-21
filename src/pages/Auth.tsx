@@ -109,9 +109,10 @@ const Auth = () => {
         if (error) throw error;
         // Require explicit log in after account creation
         await supabase.auth.signOut();
-        toast.success("Account created", { description: "Please log in to continue." });
-        setMode("signin");
+        toast.success("Account created", { description: "Watch the intro, then log in." });
         setPassword("");
+        navigate("/welcome", { replace: true });
+        return;
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;

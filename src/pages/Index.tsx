@@ -2192,7 +2192,7 @@ function MyParentView({
                     key={r.id}
                     className="p-2 rounded-md border border-border bg-secondary/40 flex items-center justify-between gap-2 flex-wrap"
                   >
-                    <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                    <span className="font-mono break-all">{(r.note ?? "").split("\n")[0] || "(no site)"}</span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider ${statusBadge(r.status)}`}
                     >
@@ -3727,7 +3727,8 @@ function FamilyView({
     // Side effect: for approved unblock_site, remove the row from child_banned_sites
     // so the child's extension stops blocking it on next sync.
     if (approve && extra?.kind === "unblock_site" && extra.note && extra.child_id) {
-      const host = extra.note.trim().toLowerCase();
+      // Note format: "<host>\n<reason>" (older rows may only contain the host).
+      const host = extra.note.split("\n")[0].trim().toLowerCase();
       const { error: delErr } = await supabase
         .from("child_banned_sites")
         .delete()
@@ -4070,6 +4071,9 @@ function FamilyView({
                 const who = info
                   ? `${(info.label ?? "").replace(/-/g, " ") || "Child"} (${info.email})`
                   : "A linked child";
+                const noteLines = (r.note ?? "").split("\n");
+                const siteHost = noteLines[0]?.trim() || "";
+                const childReason = noteLines.slice(1).join("\n").trim();
                 return (
                   <li
                     key={r.id}
@@ -4084,11 +4088,16 @@ function FamilyView({
                           : r.kind === "unblock_site"
                           ? (
                               <span>
-                                Unblock <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                                Unblock <span className="font-mono break-all">{siteHost || "(no site)"}</span>
                               </span>
                             )
                           : r.kind}
                       </div>
+                      {r.kind === "unblock_site" && childReason && (
+                        <div className="text-[11px] text-muted-foreground mt-1 whitespace-pre-wrap">
+                          <span className="font-semibold text-foreground">Their reason:</span> {childReason}
+                        </div>
+                      )}
                       <div className="text-[10px] text-muted-foreground">
                         From {who} · {new Date(r.created_at).toLocaleString()}
                       </div>
