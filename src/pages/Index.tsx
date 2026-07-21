@@ -3036,13 +3036,36 @@ function FamilyView({
   onRefresh: () => void;
   onClear: () => void;
 }) {
-  const children: string[] = (() => {
+  const [children, setChildren] = useState<string[]>(() => {
     try {
       return JSON.parse(localStorage.getItem(`ts_family_children_${parentEmail}`) || "[]");
     } catch {
       return [];
     }
-  })();
+  });
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+
+  const removeChild = (childEmail: string) => {
+    const next = children.filter((c) => c !== childEmail);
+    setChildren(next);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
+    // Drop any pending alerts from that child on this device.
+    try {
+      const key = `ts_family_alerts_${parentEmail}`;
+      const raw = JSON.parse(localStorage.getItem(key) || "[]");
+      const filtered = Array.isArray(raw)
+        ? raw.filter((a: { child_email?: string }) => (a.child_email ?? "").toLowerCase() !== childEmail.toLowerCase())
+        : [];
+      localStorage.setItem(key, JSON.stringify(filtered));
+    } catch {
+      /* ignore */
+    }
+    // Also clear the by-email child->parent pointer if present.
+    localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    setConfirmRemove(null);
+    onRefresh();
+    toast.success(`Removed ${childEmail} from family`);
+  };
 
   return (
     <div className="space-y-4">
@@ -3073,13 +3096,44 @@ function FamilyView({
           ) : (
             <ul className="text-xs space-y-1">
               {children.map((c) => (
-                <li key={c} className="text-muted-foreground">
-                  • {c}
+                <li key={c} className="flex items-center justify-between gap-2 group">
+                  <span className="text-muted-foreground truncate">• {c}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-destructive hover:text-destructive"
+                    onClick={() => setConfirmRemove(c)}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Remove
+                  </Button>
                 </li>
               ))}
             </ul>
           )}
         </div>
+
+      <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove child account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This unlinks <span className="font-semibold">{confirmRemove}</span> from your family on this device and
+              clears their alerts from your inbox. The child's Trust Shield account itself is not deleted — they can
+              still sign in, but their alerts will no longer be forwarded to you.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRemove && removeChild(confirmRemove)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
         <div className="mt-4 flex items-center justify-between">
           <div className="text-xs font-semibold text-muted-foreground">
