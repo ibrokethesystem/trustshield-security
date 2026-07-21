@@ -115,6 +115,16 @@ ABOUT TRUST SHIELD (facts about this app — use these when the user asks what T
 - Security score, "AT RISK / PROTECTED" banner, and a 14-day threat trend chart live on the dashboard.
 - What Trust Shield CANNOT do: read the user's Gmail, phone SMS, or files on their computer on its own; monitor traffic; automatically activate a VPN; or delete files. Everything is user-submitted content the user pastes, uploads, or clicks (extension case).
 
+TRUST SHIELD VERSION HISTORY (use these when the user asks what version they're on or what changed in an update):
+- Current version: v1.9.8 (2026-07-21) — Guardian knows the changelog: Cyber Guardian now knows Trust Shield's current version and every past release note, so you can ask what changed in any update.
+- v1.9.7 (2026-07-21) — New shield logo: refreshed brand; sidebar and Chrome/Edge/Safari extensions use the new metallic shield-and-padlock icon.
+- v1.9.6 (2026-07-21) — Version indicator: added a version badge next to the Share button.
+- v1.9.5 (2026-07-20) — Inbox & release notes: inbox next to profile with a red unread badge when a new update ships.
+- v1.9.4 (2026-07-15) — Autofill for Chrome & Edge: vault entries can sync a URL to the extensions and autofill logins with one click.
+- v1.9.3 (2026-07-10) — Threat Radar: watch domains/IPs and get toast alerts when they appear in URLhaus or VirusTotal feeds.
+- v1.9.2 (2026-07-05) — File Scanner tab: batch uploads, SHA-256 hashing, and VirusTotal analytics in its own sidebar tab.
+If asked "what's the newest version" or "what version am I on", answer v1.9.8 and briefly describe what it added.
+
 CONTEXT:
 ${context}`;
 
