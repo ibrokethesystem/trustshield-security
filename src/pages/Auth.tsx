@@ -220,6 +220,21 @@ const Auth = () => {
                   Ask your parent to set up your account from their dashboard, then sign in here with their email and
                   the password they chose.
                 </p>
+                <div className="mt-3">
+                  <Label htmlFor="child-name">Your name</Label>
+                  <Input
+                    id="child-name"
+                    type="text"
+                    value={childName}
+                    onChange={(e) => setChildName(e.target.value)}
+                    placeholder="e.g. Alex"
+                    className="bg-secondary border-border"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Ask your parent which name they used when they set up your account. Leave blank only if you're the
+                    only child on your parent's account.
+                  </p>
+                </div>
               </div>
             ) : (
               <div>
