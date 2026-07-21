@@ -276,6 +276,11 @@ const Index = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
+  const [role, setRole] = useState<Role>("solo");
+  const [parentEmail, setParentEmail] = useState<string>("");
+  const [familyAlerts, setFamilyAlerts] = useState<
+    { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
+  >([]);
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -299,7 +304,12 @@ const Index = () => {
   const showInbox = hasFeature("1.9.5");
   const showThreatRadar = hasFeature("1.9.3");
   const showVersionPill = hasFeature("1.9.6");
-  const visibleNavItems = navItems.filter((n) => !n.minVersion || hasFeature(n.minVersion));
+  const visibleNavItems = navItems.filter((n) => {
+    if (n.minVersion && !hasFeature(n.minVersion)) return false;
+    if (role === "child" && n.hideForChild) return false;
+    if (n.parentOnly && role !== "parent") return false;
+    return true;
+  });
   // Dev feature auto-removes at v2.5.0 per spec.
   const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
   const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
