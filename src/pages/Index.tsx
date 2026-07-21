@@ -75,10 +75,10 @@ const UPDATES: UpdateNote[] = [
   {
     id: "2.0.0",
     version: "2.0.0",
-    name: "QR scanner + Trust Shield Extension 2.0",
+    name: "QR scanner, Family Mode & Trust Shield Extension 2.0",
     date: "2026-07-21",
     summary:
-      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains). Version switcher now truly reverts the UI to older releases — features added after the selected version hide themselves, and \"Return to current\" restores everything.",
+      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains). Version switcher now truly reverts the UI to older releases — features added after the selected version hide themselves, and \"Return to current\" restores everything. Family Mode: \"Set up child account\" now creates the child's account directly from the parent's dashboard with a password you choose (no Google needed), and the Create account page has a \"Child\" button so a child can self-register and link to their parent's email.",
   },
   {
     id: "1.9.9",
