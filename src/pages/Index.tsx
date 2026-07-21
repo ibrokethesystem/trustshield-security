@@ -570,6 +570,34 @@ const Index = () => {
     setParentEmail(localStorage.getItem(parentKey) ?? "");
   }, [user]);
 
+  // Children: watch the parent-controlled CyberEdu switch on child_links.
+  useEffect(() => {
+    if (!user || role !== "child") { setEduDisabled(false); return; }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("child_links")
+        .select("edu_disabled")
+        .eq("child_id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!cancelled) setEduDisabled(!!data?.edu_disabled);
+    };
+    load();
+    const channel = supabase
+      .channel(`child-edu-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "child_links", filter: `child_id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new as { edu_disabled?: boolean };
+          setEduDisabled(!!row.edu_disabled);
+        },
+      )
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user, role]);
+
   const loadFamilyAlerts = useCallback(() => {
     if (!user) return;
     const myEmail = (user.email ?? "").toLowerCase();
