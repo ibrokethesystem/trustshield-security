@@ -37,6 +37,7 @@ import {
   Copy,
   MessageSquare,
   KeyRound,
+  QrCode,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -70,6 +71,14 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
 
 const UPDATES: UpdateNote[] = [
+  {
+    id: "2.0.0",
+    version: "2.0.0",
+    name: "QR code scanner (mobile)",
+    date: "2026-07-21",
+    summary:
+      "Added a QR code scanner tab. On mobile, Trust Shield uses your camera to scan QR codes and warn you before opening malicious links. Desktop shows a notice that the scanner is mobile-only.",
+  },
   {
     id: "1.9.9",
     version: "1.9.9",
@@ -165,13 +174,14 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
+  { key: "qr", label: "QR scanner", icon: QrCode },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
@@ -1011,6 +1021,8 @@ const Index = () => {
           />
         ) : view === "network" ? (
           <NetworkScanView />
+        ) : view === "qr" ? (
+          <QrScannerView />
         ) : view === "passwords" ? (
           <PasswordsView
             userId={user?.id}
@@ -2295,6 +2307,215 @@ function DeviceScanner() {
           </p>
         </div>
       )}
+    </Card>
+  );
+}
+
+function QrScannerView() {
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [supported, setSupported] = useState<boolean>(false);
+  const [scanning, setScanning] = useState(false);
+  const [result, setResult] = useState<string>("");
+  const [verdict, setVerdict] = useState<null | { safe: boolean; reason: string }>(null);
+  const [error, setError] = useState<string>("");
+  const videoRef = (useMemo(() => ({ current: null as HTMLVideoElement | null }), []));
+  const streamRef = useMemo(() => ({ current: null as MediaStream | null }), []);
+  const rafRef = useMemo(() => ({ current: 0 as number }), []);
+
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+    const touch = (navigator as unknown as { maxTouchPoints?: number }).maxTouchPoints ?? 0;
+    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || touch > 1;
+    setIsMobile(mobile);
+    setSupported(typeof (window as unknown as { BarcodeDetector?: unknown }).BarcodeDetector !== "undefined");
+    if (!mobile) {
+      toast("QR scanner is mobile-only", {
+        description: "Open Trust Shield on your phone to scan QR codes with the camera.",
+      });
+    }
+    return () => {
+      stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopCamera = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = 0;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  };
+
+  const evaluate = (text: string) => {
+    const t = text.trim();
+    let url: URL | null = null;
+    try {
+      url = new URL(t);
+    } catch {
+      // not a URL
+    }
+    const suspicious = [
+      /bit\.ly|tinyurl|t\.co|shorte\.st|is\.gd|goo\.gl/i,
+      /login|verify|update|account|secure|wallet|reset/i,
+      /free.*(gift|prize|bitcoin|crypto)/i,
+      /@/, // credentials in URL
+    ];
+    if (url) {
+      if (url.protocol === "http:") return { safe: false, reason: "Unencrypted http:// link — data can be intercepted." };
+      if (suspicious.some((r) => r.test(url!.href))) return { safe: false, reason: "URL matches known phishing / shortener patterns." };
+      return { safe: true, reason: `Looks like a normal ${url.protocol.replace(":", "")} link to ${url.hostname}.` };
+    }
+    if (/^(tel:|sms:|mailto:)/i.test(t)) return { safe: true, reason: "Contact link — verify the number/address before using it." };
+    if (/BEGIN:VCARD/i.test(t)) return { safe: true, reason: "Contact card (vCard)." };
+    return { safe: true, reason: "Plain text QR — no link detected." };
+  };
+
+  const startScan = async () => {
+    setError("");
+    setResult("");
+    setVerdict(null);
+    if (!isMobile) {
+      toast("QR scanner is mobile-only", { description: "Please use your phone." });
+      return;
+    }
+    if (!supported) {
+      setError("Your browser does not support in-browser QR scanning. Try the latest Chrome on Android.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setScanning(true);
+      // wait a tick for the <video> to mount
+      setTimeout(async () => {
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play();
+        // @ts-expect-error - BarcodeDetector is not in lib.dom
+        const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+        const tick = async () => {
+          if (!streamRef.current) return;
+          try {
+            const codes = await detector.detect(video);
+            if (codes && codes[0]?.rawValue) {
+              const raw = codes[0].rawValue as string;
+              setResult(raw);
+              const v = evaluate(raw);
+              setVerdict(v);
+              if (v.safe) toast.success("QR code scanned", { description: raw });
+              else toast.error("Suspicious QR code", { description: v.reason });
+              stopCamera();
+              return;
+            }
+          } catch {
+            // ignore per-frame errors
+          }
+          rafRef.current = requestAnimationFrame(tick);
+        };
+        rafRef.current = requestAnimationFrame(tick);
+      }, 50);
+    } catch (e) {
+      setError((e as Error).message || "Could not access the camera.");
+      setScanning(false);
+    }
+  };
+
+  return (
+    <Card>
+      <div className="space-y-4">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+          <QrCode className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold">QR code scanner</h2>
+          <p className="text-sm text-muted-foreground">
+            Scan a QR code with your camera. Trust Shield checks the encoded link before you open it.
+          </p>
+        </div>
+      </div>
+
+      {!isMobile && (
+        <div className="flex items-start gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+          <AlertTriangle className="w-5 h-5 text-yellow-400 shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <p className="font-medium text-yellow-300">QR scanner is mobile-only</p>
+            <p className="text-muted-foreground">
+              Open Trust Shield on your phone (or install it as a PWA) to use the camera-based QR scanner.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isMobile && !scanning && (
+        <Button onClick={startScan} className="w-full">
+          <Camera className="w-4 h-4 mr-2" /> Start scanning
+        </Button>
+      )}
+
+      {scanning && (
+        <div className="space-y-2">
+          <div className="relative rounded-lg overflow-hidden border border-border bg-black aspect-square max-w-sm mx-auto">
+            <video
+              ref={(el) => {
+                videoRef.current = el;
+              }}
+              className="w-full h-full object-cover"
+              muted
+              playsInline
+            />
+            <div className="absolute inset-6 border-2 border-primary/60 rounded-lg pointer-events-none" />
+          </div>
+          <Button variant="outline" onClick={stopCamera} className="w-full">
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {error && (
+        <div className="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+          {error}
+        </div>
+      )}
+
+      {result && verdict && (
+        <div
+          className={cn(
+            "rounded-lg border p-4 space-y-2",
+            verdict.safe
+              ? "bg-emerald-500/10 border-emerald-500/30"
+              : "bg-destructive/10 border-destructive/40",
+          )}
+        >
+          <div className="flex items-center gap-2 font-semibold">
+            {verdict.safe ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+            )}
+            {verdict.safe ? "Looks safe" : "Suspicious QR code"}
+          </div>
+          <p className="text-sm text-muted-foreground">{verdict.reason}</p>
+          <div className="text-xs font-mono break-all bg-secondary/40 border border-border rounded p-2">
+            {result}
+          </div>
+          {/^https?:\/\//i.test(result) && verdict.safe && (
+            <Button asChild variant="outline" size="sm">
+              <a href={result} target="_blank" rel="noopener noreferrer">
+                Open link
+              </a>
+            </Button>
+          )}
+        </div>
+      )}
+      </div>
     </Card>
   );
 }
