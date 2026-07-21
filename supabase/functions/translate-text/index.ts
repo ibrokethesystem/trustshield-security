@@ -14,8 +14,8 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: userData } = await supabase.auth.getUser(token);
-    if (!userData?.user) return json({ error: 'Not signed in' }, 401);
+    const { data: claimsData } = await supabase.auth.getClaims(token);
+    if (!claimsData?.claims?.sub) return json({ error: 'Not signed in' }, 401);
     if (!LOVABLE_API_KEY) return json({ error: 'AI unavailable' }, 500);
     const body = await req.json().catch(() => ({}));
     const texts: string[] = Array.isArray(body.texts) ? body.texts.slice(0, 400) : [];

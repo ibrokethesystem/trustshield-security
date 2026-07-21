@@ -18,8 +18,8 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
     const token = authHeader.replace(/^Bearer\s+/i, '');
-    const { data: userData } = await supabase.auth.getUser(token);
-    if (!userData?.user) {
+    const { data: claimsData } = await supabase.auth.getClaims(token);
+    if (!claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: 'Not signed in' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
