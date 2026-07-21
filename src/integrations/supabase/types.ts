@@ -351,13 +351,7 @@ export type Database = {
       }
     }
     Views: {
-      sibling_view: {
-        Row: {
-          sibling_id: string | null
-          sibling_label: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       find_parent_id_by_email: { Args: { _email: string }; Returns: string }

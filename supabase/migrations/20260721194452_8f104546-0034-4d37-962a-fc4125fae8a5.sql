@@ -1,0 +1,1 @@
+DROP VIEW IF EXISTS public.sibling_view;
