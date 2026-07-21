@@ -93,8 +93,45 @@ document.getElementById("pair").addEventListener("click", async () => {
 });
 
 document.getElementById("signOut").addEventListener("click", async () => {
+  const ok = await askParent("Signing out unpairs this browser from your parent's Trust Shield. Re-enter their email and password.");
+  if (!ok) return;
   await chrome.storage.local.remove(["ts_session", "ts_banned_hosts"]);
   refreshView();
 });
 
 refreshView();
+
+function askParent(desc) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("lockModal");
+    const emailEl = document.getElementById("lockEmail");
+    const passEl = document.getElementById("lockPass");
+    const statusEl = document.getElementById("lockStatus");
+    const confirm = document.getElementById("lockConfirm");
+    const cancel = document.getElementById("lockCancel");
+    document.getElementById("lockDesc").textContent = desc;
+    emailEl.value = ""; passEl.value = ""; statusEl.textContent = "";
+    modal.style.display = "flex";
+    const close = (v) => { modal.style.display = "none"; confirm.onclick = null; cancel.onclick = null; resolve(v); };
+    cancel.onclick = () => close(false);
+    confirm.onclick = async () => {
+      const email = emailEl.value.trim().toLowerCase();
+      const password = passEl.value;
+      if (!email || !password) { statusEl.textContent = "Enter parent email and password."; return; }
+      statusEl.textContent = "Checking…";
+      confirm.disabled = true;
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!res.ok) { statusEl.textContent = "Wrong email or password."; confirm.disabled = false; return; }
+        close(true);
+      } catch {
+        statusEl.textContent = "Network error. Try again.";
+        confirm.disabled = false;
+      }
+    };
+  });
+}

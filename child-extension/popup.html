@@ -65,6 +65,23 @@
   </div>
 
   <p class="foot">v2.0.0 • Child Edition</p>
+
+  <div id="lockModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,0.85);align-items:center;justify-content:center;padding:14px;">
+    <div style="background:#111a2e;border:1px solid #1e2a44;border-radius:12px;padding:14px;width:100%;box-sizing:border-box;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Parent approval required</div>
+      <p id="lockDesc" style="font-size:11px;color:#94a3b8;margin:0 0 8px;">Ask your parent to re-enter their Trust Shield email and password.</p>
+      <label style="font-size:11px;color:#c9d5ec;">Parent's email</label>
+      <input id="lockEmail" type="email" autocomplete="off" style="width:100%;box-sizing:border-box;background:#0b1424;color:#e6edf7;border:1px solid #22304d;border-radius:8px;padding:6px 8px;font-size:12px;margin:2px 0 6px;" />
+      <label style="font-size:11px;color:#c9d5ec;">Password</label>
+      <input id="lockPass" type="password" autocomplete="off" style="width:100%;box-sizing:border-box;background:#0b1424;color:#e6edf7;border:1px solid #22304d;border-radius:8px;padding:6px 8px;font-size:12px;margin:2px 0 8px;" />
+      <div style="display:flex;gap:6px;">
+        <button id="lockConfirm" style="flex:1;background:#3b82f6;color:white;border:0;border-radius:8px;padding:8px;font-weight:600;">Confirm</button>
+        <button id="lockCancel" style="flex:1;">Cancel</button>
+      </div>
+      <div id="lockStatus" style="font-size:11px;color:#f87171;margin-top:6px;min-height:14px;"></div>
+    </div>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>
