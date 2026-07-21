@@ -1596,7 +1596,11 @@ const Index = () => {
         ) : view === "cyberedu" ? (
           <CyberEduView userId={user?.id} />
         ) : view === "myparent" ? (
-          <MyParentView parentEmail={parentEmail} childEmail={user?.email ?? ""} />
+          <MyParentView
+            parentEmail={parentEmail}
+            childEmail={user?.email ?? ""}
+            childUserId={user?.id}
+          />
         ) : (
           <GuardianView
             threats={threats ?? []}
