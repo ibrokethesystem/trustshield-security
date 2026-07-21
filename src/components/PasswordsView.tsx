@@ -363,6 +363,20 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
     });
   };
 
+  const deleteAutofill = async (id: string) => {
+    if (userId) {
+      const { error } = await supabase.from("vault_entries").update({ url: "" } as any).eq("id", id).eq("user_id", userId);
+      if (error) { toast.error("Couldn't delete autofill", { description: error.message }); return; }
+    }
+    const next = entries.map((e) => e.id === id ? { ...e, url: "" } : e);
+    setEntries(next);
+    if (!userId) { try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {} }
+    if (autofillEditId === id) { setAutofillEditId(null); setAutofillUrl(""); }
+    toast.success("Autofill deleted", {
+      description: "Reopen the Trust Shield extension and press \"Sync autofill\" to remove it from your browser too.",
+    });
+  };
+
   const copyAutofillPayload = async () => {
     const items = entries
       .filter((e) => e.url)
@@ -719,6 +733,14 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
                       <button className="text-xs text-primary hover:underline inline-flex items-center gap-1" onClick={() => openAutofill(e)}>
                         <Globe className="h-3 w-3" /> {e.url ? "Edit autofill" : "Set up autofill"}
                       </button>
+                      {e.url && (
+                        <button
+                          className="text-xs text-destructive hover:underline inline-flex items-center gap-1"
+                          onClick={() => deleteAutofill(e.id)}
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete autofill
+                        </button>
+                      )}
                     </div>
                     {e.notes && <div className="text-xs text-muted-foreground mt-1">{e.notes}</div>}
                     {autofillEditId === e.id && (
