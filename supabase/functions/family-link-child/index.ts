@@ -35,30 +35,35 @@ Deno.serve(async (req) => {
     const parent = userData.user;
     const parentEmail = parent.email!.toLowerCase();
 
-    const childEmail = await childEmailFor(parentEmail);
-
-    // Find the child user by email (paginate a bit — the family email suffix is unique).
-    let child: { id: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
-    for (let page = 1; page <= 20 && !child; page++) {
+    // Find every child user whose metadata pairs them to this parent email.
+    // Supports multi-child (labeled) accounts and legacy single-child.
+    const legacyEmail = await childEmailFor(parentEmail);
+    const matches: { id: string; email: string }[] = [];
+    for (let page = 1; page <= 20; page++) {
       const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
       if (error) break;
-      const found = data.users.find((u) => (u.email ?? "").toLowerCase() === childEmail);
-      if (found) child = { id: found.id, email: found.email ?? undefined, user_metadata: found.user_metadata };
+      for (const u of data.users) {
+        const meta = (u.user_metadata ?? {}) as { parent_email?: string; role?: string };
+        const email = (u.email ?? "").toLowerCase();
+        const linkedByMeta =
+          (meta.parent_email ?? "").toLowerCase() === parentEmail && meta.role === "child";
+        const linkedByLegacy = email === legacyEmail;
+        if (linkedByMeta || linkedByLegacy) matches.push({ id: u.id, email: u.email ?? "" });
+      }
       if (data.users.length < 200) break;
     }
-    if (!child) return json({ error: "No child account found for this parent email. Create one first from the dashboard." }, 404);
-
-    const meta = (child.user_metadata ?? {}) as { parent_email?: string; role?: string };
-    if ((meta.parent_email ?? "").toLowerCase() !== parentEmail || meta.role !== "child") {
-      return json({ error: "Child account is not linked to this parent email." }, 403);
+    if (matches.length === 0) {
+      return json({ error: "No child account found for this parent email. Create one first from the dashboard." }, 404);
     }
 
-    const { error: upErr } = await admin
-      .from("child_links")
-      .upsert({ parent_id: parent.id, child_id: child.id }, { onConflict: "child_id" });
-    if (upErr) return json({ error: upErr.message }, 500);
+    for (const m of matches) {
+      const { error: upErr } = await admin
+        .from("child_links")
+        .upsert({ parent_id: parent.id, child_id: m.id }, { onConflict: "child_id" });
+      if (upErr) return json({ error: upErr.message }, 500);
+    }
 
-    return json({ ok: true, child_id: child.id, child_email: childEmail });
+    return json({ ok: true, linked: matches.length, children: matches });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 500);
   }
