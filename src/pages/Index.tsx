@@ -174,16 +174,25 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr";
-const navItems: { key: ViewKey; label: string; icon: React.ElementType; minVersion?: string }[] = [
+type Role = "solo" | "parent" | "child";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr" | "family";
+const navItems: {
+  key: ViewKey;
+  label: string;
+  icon: React.ElementType;
+  minVersion?: string;
+  hideForChild?: boolean;
+  parentOnly?: boolean;
+}[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
-  { key: "passwords", label: "Passwords", icon: KeyRound },
-  { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2" },
-  { key: "network", label: "Network safety", icon: Wifi },
+  { key: "family", label: "Family", icon: Users, parentOnly: true },
+  { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
+  { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2", hideForChild: true },
+  { key: "network", label: "Network safety", icon: Wifi, hideForChild: true },
   { key: "qr", label: "QR scanner", icon: QrCode, minVersion: "2.0.0" },
   { key: "history", label: "Scan history", icon: History },
-  { key: "extensions", label: "Extensions", icon: Puzzle },
+  { key: "extensions", label: "Extensions", icon: Puzzle, hideForChild: true },
 ];
 
 // Compare semver strings ("1.9.9" vs "2.0.0"). Module-level so NetworkScanView etc. can use it.
@@ -267,6 +276,11 @@ const Index = () => {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [submissions, setSubmissions] = useState(0);
   const [view, setView] = useState<ViewKey>("dashboard");
+  const [role, setRole] = useState<Role>("solo");
+  const [parentEmail, setParentEmail] = useState<string>("");
+  const [familyAlerts, setFamilyAlerts] = useState<
+    { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
+  >([]);
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -290,7 +304,12 @@ const Index = () => {
   const showInbox = hasFeature("1.9.5");
   const showThreatRadar = hasFeature("1.9.3");
   const showVersionPill = hasFeature("1.9.6");
-  const visibleNavItems = navItems.filter((n) => !n.minVersion || hasFeature(n.minVersion));
+  const visibleNavItems = navItems.filter((n) => {
+    if (n.minVersion && !hasFeature(n.minVersion)) return false;
+    if (role === "child" && n.hideForChild) return false;
+    if (n.parentOnly && role !== "parent") return false;
+    return true;
+  });
   // Dev feature auto-removes at v2.5.0 per spec.
   const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
   const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
@@ -445,6 +464,54 @@ const Index = () => {
     if (user) loadProfile();
   }, [user, loadProfile]);
 
+  // Role & family linking. On first sign-in after "Have a child?" flow, this user
+  // is marked as a child linked to a parent's email. Data lives in localStorage.
+  useEffect(() => {
+    if (!user) return;
+    const roleKey = `ts_role_${user.id}`;
+    const parentKey = `ts_parent_email_${user.id}`;
+    const pending = localStorage.getItem("ts_pending_child_signup");
+    if (pending && !localStorage.getItem(roleKey)) {
+      localStorage.setItem(roleKey, "child");
+      localStorage.setItem(parentKey, pending);
+      localStorage.removeItem("ts_pending_child_signup");
+      // Register this child under the parent's family index for discovery.
+      const idxKey = `ts_family_children_${pending}`;
+      const existing: string[] = JSON.parse(localStorage.getItem(idxKey) || "[]");
+      const email = user.email ?? "";
+      if (email && !existing.includes(email)) existing.push(email);
+      localStorage.setItem(idxKey, JSON.stringify(existing));
+    }
+    const storedRole = (localStorage.getItem(roleKey) as Role | null) ?? null;
+    const myEmail = (user.email ?? "").toLowerCase();
+    let nextRole: Role = storedRole ?? "solo";
+    // If this email is registered as a parent (a child pointed to it), auto-promote.
+    if (nextRole !== "child" && myEmail) {
+      const kids: string[] = JSON.parse(localStorage.getItem(`ts_family_children_${myEmail}`) || "[]");
+      if (kids.length > 0) nextRole = "parent";
+    }
+    localStorage.setItem(roleKey, nextRole);
+    localStorage.setItem("ts_role", nextRole); // shared for GuardianView / ThreatRow
+    setRole(nextRole);
+    setParentEmail(localStorage.getItem(parentKey) ?? "");
+  }, [user]);
+
+  const loadFamilyAlerts = useCallback(() => {
+    if (!user) return;
+    const myEmail = (user.email ?? "").toLowerCase();
+    if (!myEmail) return;
+    const raw = localStorage.getItem(`ts_family_alerts_${myEmail}`) || "[]";
+    try {
+      setFamilyAlerts(JSON.parse(raw));
+    } catch {
+      setFamilyAlerts([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (role === "parent") loadFamilyAlerts();
+  }, [role, view, loadFamilyAlerts]);
+
   const saveName = async () => {
     if (!user) return;
     const name = nameDraft.trim();
@@ -584,7 +651,28 @@ const Index = () => {
         .select("id")
         .maybeSingle();
       if (analysis.is_threat) {
-        toast.error("Threat detected", { description: analysis.title });
+        toast.error("Threat detected", {
+          description:
+            role === "child"
+              ? `${analysis.title} — Please tell a trusted adult and don't click anything.`
+              : analysis.title,
+        });
+        // Child accounts: forward this alert to the parent's local family inbox.
+        if (role === "child" && parentEmail && user) {
+          try {
+            const key = `ts_family_alerts_${parentEmail.toLowerCase()}`;
+            const list = JSON.parse(localStorage.getItem(key) || "[]");
+            list.unshift({
+              id: crypto.randomUUID(),
+              child_email: user.email ?? "",
+              title: analysis.title,
+              severity: analysis.severity ?? "medium",
+              created_at: new Date().toISOString(),
+              summary: analysis.summary ?? "",
+            });
+            localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+          } catch { /* no-op */ }
+        }
         setScanText("");
         setScanImage(null);
         await loadThreats();
@@ -1209,6 +1297,18 @@ const Index = () => {
               setView("guardian");
             }}
           />
+        ) : view === "family" ? (
+          <FamilyView
+            alerts={familyAlerts}
+            parentEmail={(user?.email ?? "").toLowerCase()}
+            onRefresh={loadFamilyAlerts}
+            onClear={() => {
+              if (!user) return;
+              localStorage.setItem(`ts_family_alerts_${(user.email ?? "").toLowerCase()}`, "[]");
+              setFamilyAlerts([]);
+              toast.success("Family inbox cleared");
+            }}
+          />
         ) : (
           <GuardianView
             threats={threats ?? []}
@@ -1556,7 +1656,11 @@ function ThreatRow({
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("guardian-chat", {
-        body: { threat_id: threat.id, messages: next },
+        body: {
+          threat_id: threat.id,
+          messages: next,
+          audience: (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
+        },
       });
       if (error) throw error;
       const reply = (data as any)?.reply as string | undefined;
@@ -1921,6 +2025,8 @@ function GuardianView({
           mode,
           threat_id: mode === "threat" ? selectedThreatId : undefined,
           messages: next,
+          audience:
+            (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
           vault_summary: (() => {
             try {
               const raw = localStorage.getItem(`trust-shield:vault-summary:current`);
@@ -2688,5 +2794,116 @@ function QrScannerView() {
       )}
       </div>
     </Card>
+  );
+}
+
+function FamilyView({
+  alerts,
+  parentEmail,
+  onRefresh,
+  onClear,
+}: {
+  alerts: {
+    id: string;
+    child_email: string;
+    title: string;
+    severity: string;
+    created_at: string;
+    summary?: string;
+  }[];
+  parentEmail: string;
+  onRefresh: () => void;
+  onClear: () => void;
+}) {
+  const children: string[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(`ts_family_children_${parentEmail}`) || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold">Family monitor</h2>
+            <p className="text-sm text-muted-foreground">
+              Alerts from linked child accounts appear here. Children get simplified alerts and are told to talk to
+              you when something suspicious shows up.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onRefresh}>
+            Refresh
+          </Button>
+        </div>
+
+        <div className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border">
+          <div className="text-xs font-semibold mb-1">Linked children ({children.length})</div>
+          {children.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No linked child accounts yet. To add one: sign out, go to the login page, click "Have a child?" and
+              sign the child in with their own Google account using your email as parent.
+            </p>
+          ) : (
+            <ul className="text-xs space-y-1">
+              {children.map((c) => (
+                <li key={c} className="text-muted-foreground">
+                  • {c}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-xs font-semibold text-muted-foreground">
+            Recent child alerts ({alerts.length})
+          </div>
+          {alerts.length > 0 && (
+            <Button variant="outline" size="sm" onClick={onClear}>
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+        {alerts.length === 0 ? (
+          <p className="text-xs text-muted-foreground mt-2">
+            No alerts from your children yet. When a child account scans something risky, it'll show up here.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {alerts.map((a) => (
+              <li
+                key={a.id}
+                className="p-3 rounded-lg border border-border bg-card/50 flex items-start gap-3"
+              >
+                <div className="w-8 h-8 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold truncate">{a.title}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-wider bg-secondary text-muted-foreground">
+                      {a.severity}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {a.child_email} · {new Date(a.created_at).toLocaleString()}
+                  </p>
+                  {a.summary && (
+                    <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{a.summary}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
