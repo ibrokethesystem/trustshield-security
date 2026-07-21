@@ -710,7 +710,7 @@ const Index = () => {
         </div>
 
         <nav className="flex flex-col gap-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.label}
               onClick={() => setView(item.key)}
