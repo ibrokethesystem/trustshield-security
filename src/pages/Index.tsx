@@ -1400,6 +1400,13 @@ const Index = () => {
               Cancel
             </Button>
             <Button
+              variant="outline"
+              onClick={startChildEmailSignup}
+              disabled={childBusy}
+            >
+              Use email instead
+            </Button>
+            <Button
               onClick={startChildSignup}
               disabled={childBusy}
               className="bg-gradient-shield hover:opacity-90 glow-shield"
