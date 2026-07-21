@@ -3700,26 +3700,32 @@ function FamilyView({
   const submitRename = async () => {
     const email = renameOpen;
     if (!email || !parentUserId) return;
-    const label = childLabelSlug(renameValue);
-    if (!label) {
+    const displayLabel = renameValue.trim().slice(0, 60);
+    const slug = childLabelSlug(displayLabel);
+    if (!displayLabel) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    if (!slug) {
       toast.error("Name needs at least one letter or number");
       return;
     }
-    // Prevent duplicate labels for this parent
+    // Prevent duplicate labels for this parent (compare slugs so "Alex!" and
+    // "alex" are treated as the same name for login-derivation purposes).
     const { data: existing } = await supabase
       .from("child_links")
       .select("label, child_email")
       .eq("parent_id", parentUserId)
       .is("deleted_at", null);
     if ((existing ?? []).some(
-      (r) => (r.label ?? "").toLowerCase() === label && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
+      (r) => childLabelSlug(r.label ?? "") === slug && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
     )) {
       toast.error("You already have another child with that name");
       return;
     }
     const { error } = await supabase
       .from("child_links")
-      .update({ label })
+      .update({ label: displayLabel })
       .eq("parent_id", parentUserId)
       .ilike("child_email", email);
     if (error) {
@@ -3734,7 +3740,13 @@ function FamilyView({
 
   const displayName = (email: string) => {
     const label = childLabels[email.toLowerCase()];
-    return label ? `${label.replace(/-/g, " ")} · ${email}` : email;
+    // Older accounts stored slug-style labels ("alex-doe"); newer renames keep
+    // the raw text with capitals/symbols. Only substitute dashes when the label
+    // has no spaces (i.e. it's clearly the old slug form).
+    const pretty = label && !/\s/.test(label) && !/[A-Z]/.test(label)
+      ? label.replace(/-/g, " ")
+      : label;
+    return pretty ? `${pretty} · ${email}` : email;
   };
 
   const loadDeleted = useCallback(async () => {
@@ -3962,7 +3974,12 @@ function FamilyView({
                       className="h-6 px-2"
                       onClick={() => {
                         setRenameOpen(c);
-                        setRenameValue((childLabels[c.toLowerCase()] ?? "").replace(/-/g, " "));
+                        {
+                          const raw = childLabels[c.toLowerCase()] ?? "";
+                          setRenameValue(
+                            !/\s/.test(raw) && !/[A-Z]/.test(raw) ? raw.replace(/-/g, " ") : raw,
+                          );
+                        }
                       }}
                     >
                       <Pencil className="w-3 h-3 mr-1" />
