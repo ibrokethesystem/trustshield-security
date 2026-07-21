@@ -1908,9 +1908,10 @@ function MyParentView({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [siblings, setSiblings] = useState<{ child_id: string; child_email: string; label: string | null }[]>([]);
   const [requests, setRequests] = useState<
-    { id: string; kind: string; status: string; created_at: string; resolved_at: string | null }[]
+    { id: string; kind: string; status: string; created_at: string; resolved_at: string | null; note: string | null }[]
   >([]);
   const [reqBusy, setReqBusy] = useState(false);
+  const [unblockUrl, setUnblockUrl] = useState("");
 
   const loadSiblings = useCallback(async () => {
     if (!childUserId) return;
@@ -1922,7 +1923,7 @@ function MyParentView({
     if (!childUserId) return;
     const { data } = await supabase
       .from("permission_requests")
-      .select("id, kind, status, created_at, resolved_at")
+      .select("id, kind, status, created_at, resolved_at, note")
       .eq("child_id", childUserId)
       .order("created_at", { ascending: false });
     setRequests((data ?? []) as typeof requests);
@@ -1935,7 +1936,10 @@ function MyParentView({
   const approvedDeleteReq = requests.find((r) => r.kind === "delete_account" && r.status === "approved");
   const removalReq = activeRequestOfKind("remove_extension");
 
-  const requestPermission = async (kind: "delete_account" | "remove_extension") => {
+  const requestPermission = async (
+    kind: "delete_account" | "remove_extension" | "unblock_site",
+    note?: string,
+  ) => {
     if (!childUserId) return;
     setReqBusy(true);
     try {
@@ -1949,17 +1953,21 @@ function MyParentView({
         toast.error("Couldn't find your parent account");
         return;
       }
-      // Cancel any prior pending request of the same kind so we don't spam.
-      await supabase
-        .from("permission_requests")
-        .delete()
-        .eq("child_id", childUserId)
-        .eq("kind", kind)
-        .eq("status", "pending");
+      // For account/extension actions, cancel prior pending of same kind so we
+      // don't spam. Unblock requests can stack (different URLs).
+      if (kind !== "unblock_site") {
+        await supabase
+          .from("permission_requests")
+          .delete()
+          .eq("child_id", childUserId)
+          .eq("kind", kind)
+          .eq("status", "pending");
+      }
       const { error } = await supabase.from("permission_requests").insert({
         parent_id: link.parent_id,
         child_id: childUserId,
         kind,
+        note: note ?? null,
       });
       if (error) {
         toast.error("Couldn't send request", { description: error.message });
@@ -1972,6 +1980,28 @@ function MyParentView({
     } finally {
       setReqBusy(false);
     }
+  };
+
+  const normalizeHost = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+      const withScheme = trimmed.match(/^https?:\/\//i) ? trimmed : `https://${trimmed}`;
+      const u = new URL(withScheme);
+      return u.hostname.toLowerCase().replace(/^www\./, "");
+    } catch {
+      return null;
+    }
+  };
+
+  const submitUnblock = async () => {
+    const host = normalizeHost(unblockUrl);
+    if (!host) {
+      toast.error("Please enter a valid website like example.com");
+      return;
+    }
+    await requestPermission("unblock_site", host);
+    setUnblockUrl("");
   };
 
   const deleteSelf = async () => {
@@ -1999,7 +2029,13 @@ function MyParentView({
   };
 
   const kindLabel = (k: string) =>
-    k === "delete_account" ? "Delete my account" : k === "remove_extension" ? "Remove browser extension" : k;
+    k === "delete_account"
+      ? "Delete my account"
+      : k === "remove_extension"
+      ? "Remove browser extension"
+      : k === "unblock_site"
+      ? "Unblock a website"
+      : k;
   const statusBadge = (s: string) =>
     s === "approved"
       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
@@ -2071,6 +2107,66 @@ function MyParentView({
             <li>• Your parent gets a note when Trust Shield sees something dangerous.</li>
           </ul>
         </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Ban className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold">Ask a parent to unblock a site</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              If a website is blocked but you really need it for school or homework, ask your grown-up. They'll get
+              a note in their Family tab and can turn it back on for you.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto] max-w-xl">
+          <Input
+            value={unblockUrl}
+            onChange={(e) => setUnblockUrl(e.target.value)}
+            placeholder="example.com or the full link"
+          />
+          <Button
+            size="sm"
+            disabled={reqBusy || !childUserId || !unblockUrl.trim()}
+            onClick={submitUnblock}
+          >
+            <Send className="w-3.5 h-3.5 mr-1" />
+            Ask my grown-up
+          </Button>
+        </div>
+        {(() => {
+          const unblockReqs = requests.filter((r) => r.kind === "unblock_site").slice(0, 6);
+          if (unblockReqs.length === 0) return null;
+          return (
+            <div className="mt-4">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+                Your unblock requests
+              </div>
+              <ul className="space-y-1.5 text-xs">
+                {unblockReqs.map((r) => (
+                  <li
+                    key={r.id}
+                    className="p-2 rounded-md border border-border bg-secondary/40 flex items-center justify-between gap-2 flex-wrap"
+                  >
+                    <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider ${statusBadge(r.status)}`}
+                    >
+                      {r.status === "approved"
+                        ? "Approved"
+                        : r.status === "denied"
+                        ? "Said no"
+                        : "Waiting"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })()}
       </Card>
 
       <Card>
@@ -3533,29 +3629,35 @@ function FamilyView({
   const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
   const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
   const [childLabels, setChildLabels] = useState<Record<string, string>>({});
+  const [childInfoById, setChildInfoById] = useState<Record<string, { email: string; label: string | null }>>({});
+  const [renameOpen, setRenameOpen] = useState<string | null>(null); // child email being renamed
+  const [renameValue, setRenameValue] = useState("");
   const [pendingRequests, setPendingRequests] = useState<
-    { id: string; kind: string; status: string; created_at: string; child_id: string }[]
+    { id: string; kind: string; status: string; created_at: string; child_id: string; note: string | null }[]
   >([]);
 
   const loadLabels = useCallback(async () => {
     if (!parentUserId) return;
     const { data } = await supabase
       .from("child_links")
-      .select("child_email, label")
+      .select("child_id, child_email, label")
       .eq("parent_id", parentUserId)
       .is("deleted_at", null);
     const map: Record<string, string> = {};
+    const byId: Record<string, { email: string; label: string | null }> = {};
     (data ?? []).forEach((r) => {
       if (r.child_email && r.label) map[r.child_email.toLowerCase()] = r.label;
+      if (r.child_id) byId[r.child_id] = { email: (r.child_email ?? "").toLowerCase(), label: r.label ?? null };
     });
     setChildLabels(map);
+    setChildInfoById(byId);
   }, [parentUserId]);
 
   const loadRequests = useCallback(async () => {
     if (!parentUserId) return;
     const { data } = await supabase
       .from("permission_requests")
-      .select("id, kind, status, created_at, child_id")
+      .select("id, kind, status, created_at, child_id, note")
       .eq("parent_id", parentUserId)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -3564,7 +3666,25 @@ function FamilyView({
 
   useEffect(() => { void loadLabels(); void loadRequests(); }, [loadLabels, loadRequests]);
 
-  const decideRequest = async (id: string, approve: boolean) => {
+  const decideRequest = async (
+    id: string,
+    approve: boolean,
+    extra?: { kind: string; child_id: string; note: string | null },
+  ) => {
+    // Side effect: for approved unblock_site, remove the row from child_banned_sites
+    // so the child's extension stops blocking it on next sync.
+    if (approve && extra?.kind === "unblock_site" && extra.note && extra.child_id) {
+      const host = extra.note.trim().toLowerCase();
+      const { error: delErr } = await supabase
+        .from("child_banned_sites")
+        .delete()
+        .eq("user_id", extra.child_id)
+        .eq("host", host);
+      if (delErr) {
+        toast.error("Couldn't unban the site", { description: delErr.message });
+        return;
+      }
+    }
     const { error } = await supabase
       .from("permission_requests")
       .update({ status: approve ? "approved" : "denied", resolved_at: new Date().toISOString() })
@@ -3575,6 +3695,41 @@ function FamilyView({
     }
     toast.success(approve ? "Request approved" : "Request denied");
     await loadRequests();
+  };
+
+  const submitRename = async () => {
+    const email = renameOpen;
+    if (!email || !parentUserId) return;
+    const label = childLabelSlug(renameValue);
+    if (!label) {
+      toast.error("Name needs at least one letter or number");
+      return;
+    }
+    // Prevent duplicate labels for this parent
+    const { data: existing } = await supabase
+      .from("child_links")
+      .select("label, child_email")
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    if ((existing ?? []).some(
+      (r) => (r.label ?? "").toLowerCase() === label && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
+    )) {
+      toast.error("You already have another child with that name");
+      return;
+    }
+    const { error } = await supabase
+      .from("child_links")
+      .update({ label })
+      .eq("parent_id", parentUserId)
+      .ilike("child_email", email);
+    if (error) {
+      toast.error("Couldn't rename", { description: error.message });
+      return;
+    }
+    toast.success("Name updated");
+    setRenameOpen(null);
+    setRenameValue("");
+    await loadLabels();
   };
 
   const displayName = (email: string) => {
@@ -3800,6 +3955,19 @@ function FamilyView({
               {children.map((c) => (
                 <li key={c} className="flex items-center justify-between gap-2 group">
                   <span className="text-muted-foreground truncate">• {displayName(c)}</span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2"
+                      onClick={() => {
+                        setRenameOpen(c);
+                        setRenameValue((childLabels[c.toLowerCase()] ?? "").replace(/-/g, " "));
+                      }}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Rename
+                    </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -3809,6 +3977,7 @@ function FamilyView({
                     <Trash2 className="w-3 h-3 mr-1" />
                     Remove
                   </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -3827,6 +3996,10 @@ function FamilyView({
             </p>
             <ul className="text-xs space-y-2">
               {pendingRequests.map((r) => {
+                const info = childInfoById[r.child_id];
+                const who = info
+                  ? `${(info.label ?? "").replace(/-/g, " ") || "Child"} (${info.email})`
+                  : "A linked child";
                 return (
                   <li
                     key={r.id}
@@ -3838,10 +4011,16 @@ function FamilyView({
                           ? "Delete their Trust Shield account"
                           : r.kind === "remove_extension"
                           ? "Remove the browser extension"
+                          : r.kind === "unblock_site"
+                          ? (
+                              <span>
+                                Unblock <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                              </span>
+                            )
                           : r.kind}
                       </div>
                       <div className="text-[10px] text-muted-foreground">
-                        Requested {new Date(r.created_at).toLocaleString()}
+                        From {who} · {new Date(r.created_at).toLocaleString()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -3849,7 +4028,13 @@ function FamilyView({
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-emerald-400 hover:text-emerald-400"
-                        onClick={() => decideRequest(r.id, true)}
+                        onClick={() =>
+                          decideRequest(r.id, true, {
+                            kind: r.kind,
+                            child_id: r.child_id,
+                            note: r.note,
+                          })
+                        }
                       >
                         Approve
                       </Button>
@@ -4012,6 +4197,35 @@ function FamilyView({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameOpen} onOpenChange={(o) => { if (!o) { setRenameOpen(null); setRenameValue(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename child</DialogTitle>
+            <DialogDescription>
+              This is just the label shown in your Family tab. The child's password and sign-in stay the same.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 py-2">
+            <Label htmlFor="rename-child">New name</Label>
+            <Input
+              id="rename-child"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              placeholder="e.g. Alex"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRenameOpen(null); setRenameValue(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={submitRename} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
         <div className="mt-4 flex items-center justify-between">
           <div className="text-xs font-semibold text-muted-foreground">
