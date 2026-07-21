@@ -70,6 +70,7 @@ export type Database = {
           child_email: string | null
           child_id: string
           created_at: string
+          deleted_at: string | null
           id: string
           parent_id: string
         }
@@ -77,6 +78,7 @@ export type Database = {
           child_email?: string | null
           child_id: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           parent_id: string
         }
@@ -84,6 +86,7 @@ export type Database = {
           child_email?: string | null
           child_id?: string
           created_at?: string
+          deleted_at?: string | null
           id?: string
           parent_id?: string
         }
