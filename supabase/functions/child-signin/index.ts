@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
     const { data: parentId } = await admin.rpc('find_parent_id_by_email', {
       _email: parent_email,
     }) as unknown as { data: string | null };
-    if (!parentId) return json({ error: 'invalid_credentials' }, 401);
+    if (!parentId) return invalidCredentials();
 
     const { data: links } = await admin
       .from('child_links')
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
       }
     }
     const candidates = Array.from(emails);
-    if (candidates.length === 0) return json({ error: 'invalid_credentials' }, 401);
+    if (candidates.length === 0) return invalidCredentials();
 
     // Try each candidate. Use a fresh anon client so sign-in doesn't pollute state.
     const auth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -58,11 +58,18 @@ Deno.serve(async (req) => {
         }, 200);
       }
     }
-    return json({ error: 'invalid_credentials' }, 401);
+    return invalidCredentials();
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }
 });
+
+function invalidCredentials() {
+  // Wrong child-login credentials are an expected form outcome, not an app/runtime
+  // failure. Returning 200 prevents the preview runtime from blank-screening on a
+  // handled sign-in mismatch while keeping the response intentionally generic.
+  return json({ ok: false, error: 'invalid_credentials' }, 200);
+}
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
