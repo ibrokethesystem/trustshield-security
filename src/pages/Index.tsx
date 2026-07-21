@@ -89,6 +89,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.1",
+    version: "2.0.1",
+    name: "Unblock reasons & polish",
+    date: "2026-07-21",
+    summary:
+      "When a child taps \"Ask for permission\" on a blocked site, the child extension now asks them to type a sentence explaining why they want it unblocked. That reason shows up next to the request in the parent's Family tab so parents can decide with full context. Small bug fixes and version bump to 2.0.1.",
+  },
+  {
     id: "2.0.0",
     version: "2.0.0",
     name: "QR scanner, Family Mode & Trust Shield Extension 2.0",
