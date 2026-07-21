@@ -39,6 +39,7 @@ import {
   KeyRound,
   QrCode,
   GraduationCap,
+  Undo2,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import CyberEduView from "@/components/CyberEduView";
@@ -3231,19 +3232,41 @@ function FamilyView({
   });
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
+  const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
+  const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
+
+  const loadDeleted = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("child_links")
+      .select("child_id,child_email,deleted_at")
+      .eq("parent_id", parentUserId)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    setDeletedChildren(
+      (data ?? [])
+        .filter((r): r is { child_id: string; child_email: string; deleted_at: string } =>
+          Boolean(r.child_email && r.deleted_at))
+        .map((r) => ({ child_id: r.child_id, child_email: r.child_email.toLowerCase(), deleted_at: r.deleted_at })),
+    );
+  }, [parentUserId]);
+
+  useEffect(() => { loadDeleted(); }, [loadDeleted]);
 
   const removeChild = async (childEmail: string) => {
-    // Permanently delete the child auth user (and all their data) via the
-    // family-remove-child edge function. This prevents anyone from signing back
-    // into that child account.
+    // Soft-delete: mark the child_links row as deleted so the child can't sign
+    // in and their data is hidden from the Family tab, but the parent can
+    // restore them from the "Deleted children" section.
+    const emailLower = childEmail.toLowerCase();
     try {
-      const { data, error } = await supabase.functions.invoke("family-remove-child", {
-        body: { child_email: childEmail },
-      });
-      const errMsg = (error as { message?: string } | null)?.message
-        ?? (data as { error?: string } | null)?.error;
-      if (errMsg) {
-        toast.error("Couldn't delete child account", { description: errMsg });
+      if (!parentUserId) throw new Error("Not signed in");
+      const { error } = await supabase
+        .from("child_links")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("parent_id", parentUserId)
+        .ilike("child_email", emailLower);
+      if (error) {
+        toast.error("Couldn't delete child account", { description: error.message });
         setConfirmRemove(null);
         return;
       }
@@ -3255,7 +3278,7 @@ function FamilyView({
       return;
     }
 
-    const next = children.filter((c) => c !== childEmail);
+    const next = children.filter((c) => c.toLowerCase() !== emailLower);
     setChildren(next);
     localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
     // Drop any pending alerts from that child on this device.
@@ -3263,89 +3286,107 @@ function FamilyView({
       const key = `ts_family_alerts_${parentEmail}`;
       const raw = JSON.parse(localStorage.getItem(key) || "[]");
       const filtered = Array.isArray(raw)
-        ? raw.filter((a: { child_email?: string }) => (a.child_email ?? "").toLowerCase() !== childEmail.toLowerCase())
+        ? raw.filter((a: { child_email?: string }) => (a.child_email ?? "").toLowerCase() !== emailLower)
         : [];
       localStorage.setItem(key, JSON.stringify(filtered));
     } catch {
       /* ignore */
     }
-    localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    localStorage.removeItem(`ts_child_parent_by_email_${emailLower}`);
     setConfirmRemove(null);
+    await loadDeleted();
     onRefresh();
-    onChildrenChange?.(next.length);
+    // Keep the parent's role as long as anyone (active OR deleted) exists,
+    // so they can still restore. We pass the combined count.
+    onChildrenChange?.(next.length + deletedChildren.length + 1);
     toast.success(`Deleted ${childEmail}`, {
-      description: "Their Trust Shield account, browsing history, and banned sites are gone.",
+      description: "Moved to Deleted children — you can restore them from the Family tab.",
     });
   };
 
   const removeAllChildren = async () => {
     setConfirmRemoveAll(false);
-    // Gather every child linked to this parent — both local state AND any
-    // rows in child_links that this device doesn't know about (e.g. added
-    // from another device). We rely on RLS + parent_id to scope to us.
-    const collected = new Set<string>(children.map((c) => c.toLowerCase()));
-    if (parentUserId) {
-      try {
-        const { data } = await supabase
-          .from("child_links")
-          .select("child_email")
-          .eq("parent_id", parentUserId);
-        (data ?? []).forEach((row: { child_email?: string | null }) => {
-          if (row.child_email) collected.add(row.child_email.toLowerCase());
-        });
-      } catch {
-        /* fall back to local-only list */
-      }
-    }
-    const list = Array.from(collected);
-    if (list.length === 0) {
+    if (!parentUserId) return;
+    if (children.length === 0) {
       toast("No child accounts linked to delete");
       return;
     }
-    let failed: string[] = [];
-    for (const childEmail of list) {
-      try {
-        const { data, error } = await supabase.functions.invoke("family-remove-child", {
-          body: { child_email: childEmail },
-        });
-        const errMsg = (error as { message?: string } | null)?.message
-          ?? (data as { error?: string } | null)?.error;
-        if (errMsg) {
-          failed.push(childEmail);
-          continue;
-        }
-      } catch {
-        failed.push(childEmail);
-        continue;
-      }
-      localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    const { error } = await supabase
+      .from("child_links")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    if (error) {
+      toast.error("Couldn't delete child accounts", { description: error.message });
+      return;
     }
-    const remaining = failed;
-    setChildren(remaining);
-    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(remaining));
+    children.forEach((c) => localStorage.removeItem(`ts_child_parent_by_email_${c.toLowerCase()}`));
+    setChildren([]);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify([]));
     // Clear all local family alerts for deleted children
     try {
       const key = `ts_family_alerts_${parentEmail}`;
-      const raw = JSON.parse(localStorage.getItem(key) || "[]");
-      const filtered = Array.isArray(raw)
-        ? raw.filter((a: { child_email?: string }) =>
-            remaining.some((r) => r.toLowerCase() === (a.child_email ?? "").toLowerCase()))
-        : [];
-      localStorage.setItem(key, JSON.stringify(filtered));
+      localStorage.setItem(key, "[]");
     } catch {
       /* ignore */
     }
+    await loadDeleted();
     onRefresh();
-    onChildrenChange?.(remaining.length);
-    if (failed.length === 0) {
-      toast.success("All child accounts deleted", {
-        description: "Every linked child account, their browsing history, and banned sites are gone.",
-      });
-    } else {
-      toast.error(`Couldn't delete ${failed.length} child account(s)`, {
-        description: failed.join(", "),
-      });
+    // Combined count > 0 keeps the parent as parent so they can restore.
+    onChildrenChange?.(deletedChildren.length + children.length);
+    toast.success("All child accounts deleted", {
+      description: "Moved to Deleted children — you can restore any of them below.",
+    });
+  };
+
+  const restoreChild = async (childEmail: string) => {
+    if (!parentUserId) return;
+    const emailLower = childEmail.toLowerCase();
+    const { error } = await supabase
+      .from("child_links")
+      .update({ deleted_at: null })
+      .eq("parent_id", parentUserId)
+      .ilike("child_email", emailLower);
+    if (error) {
+      toast.error("Couldn't restore child", { description: error.message });
+      return;
     }
+    const next = children.includes(emailLower) ? children : [...children, emailLower];
+    setChildren(next);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
+    localStorage.setItem(`ts_child_parent_by_email_${emailLower}`, parentEmail);
+    await loadDeleted();
+    onRefresh();
+    onChildrenChange?.(next.length + deletedChildren.length);
+    toast.success(`Restored ${emailLower}`, {
+      description: "They can sign in again with the password you set.",
+    });
+  };
+
+  const purgeChild = async (childEmail: string) => {
+    setConfirmPurge(null);
+    const emailLower = childEmail.toLowerCase();
+    try {
+      const { data, error } = await supabase.functions.invoke("family-remove-child", {
+        body: { child_email: emailLower },
+      });
+      const errMsg = (error as { message?: string } | null)?.message
+        ?? (data as { error?: string } | null)?.error;
+      if (errMsg) {
+        toast.error("Couldn't purge child account", { description: errMsg });
+        return;
+      }
+    } catch (e) {
+      toast.error("Couldn't purge child account", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      });
+      return;
+    }
+    setDeletedChildren((d) => d.filter((c) => c.child_email !== emailLower));
+    onChildrenChange?.(children.length + Math.max(0, deletedChildren.length - 1));
+    toast.success(`Purged ${emailLower}`, {
+      description: "Their account, browsing history, and banned sites are gone forever.",
+    });
   };
 
   const downloadChildExtension = () => {
@@ -3460,14 +3501,59 @@ function FamilyView({
           </div>
         </div>
 
+        {deletedChildren.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              <div className="text-xs font-semibold">Deleted children ({deletedChildren.length})</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Recycle bin. Restore a child to let them sign in again, or purge them to erase their account and
+              browsing history forever.
+            </p>
+            <ul className="text-xs space-y-1">
+              {deletedChildren.map((c) => (
+                <li key={c.child_id} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-muted-foreground truncate">• {c.child_email}</div>
+                    <div className="text-[10px] text-muted-foreground/70">
+                      Deleted {new Date(c.deleted_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-primary hover:text-primary"
+                      onClick={() => restoreChild(c.child_email)}
+                    >
+                      <Undo2 className="w-3 h-3 mr-1" />
+                      Restore
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-destructive hover:text-destructive"
+                      onClick={() => setConfirmPurge(c.child_email)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Purge
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
       <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete child account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This <span className="font-semibold">permanently deletes</span>{" "}
-              <span className="font-semibold">{confirmRemove}</span> — the child account, all of their browsing
-              history, banned sites, and family alerts. They will no longer be able to sign in. This cannot be undone.
+              This moves <span className="font-semibold">{confirmRemove}</span> to the "Deleted children" recycle
+              bin. They won't be able to sign in, but you can restore them later from the Family tab. To erase them
+              forever, use "Purge" in the Deleted children section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3476,7 +3562,7 @@ function FamilyView({
               onClick={() => confirmRemove && removeChild(confirmRemove)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete forever
+              Move to Deleted
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3487,9 +3573,9 @@ function FamilyView({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete all child accounts?</AlertDialogTitle>
             <AlertDialogDescription>
-              This <span className="font-semibold">permanently deletes every linked child</span> ({children.length}) —
-              their Trust Shield accounts, browsing history, banned sites, and family alerts. None of them will be
-              able to sign in again. The Family tab will disappear once you leave it. This cannot be undone.
+              This moves <span className="font-semibold">every linked child</span> ({children.length}) to the
+              "Deleted children" recycle bin. They won't be able to sign in, but you can restore any of them from
+              the Family tab. To erase forever, purge them from the Deleted section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3498,7 +3584,29 @@ function FamilyView({
               onClick={removeAllChildren}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete all forever
+              Move all to Deleted
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmPurge} onOpenChange={(o) => !o && setConfirmPurge(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Purge this child forever?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This <span className="font-semibold">permanently erases</span>{" "}
+              <span className="font-semibold">{confirmPurge}</span> — the child account, browsing history, and
+              banned sites. This <span className="font-semibold">cannot be undone</span> and cannot be restored.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmPurge && purgeChild(confirmPurge)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Purge forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

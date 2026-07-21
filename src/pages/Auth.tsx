@@ -49,6 +49,27 @@ const Auth = () => {
             "That parent email + password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
           );
         }
+        // If the parent soft-deleted this child (recycle bin), block sign-in.
+        try {
+          const { data: sess } = await supabase.auth.getUser();
+          const cid = sess.user?.id;
+          if (cid) {
+            const { data: link } = await supabase
+              .from("child_links")
+              .select("deleted_at")
+              .eq("child_id", cid)
+              .maybeSingle();
+            if (link?.deleted_at) {
+              await supabase.auth.signOut();
+              throw new Error(
+                "This child account was deleted by the parent. Ask them to restore it from the Family tab."
+              );
+            }
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("This child account was deleted")) throw e;
+          // Otherwise ignore — don't block sign-in on transient network errors.
+        }
         // Seed local role so this device recognizes the child immediately.
         localStorage.setItem("ts_pending_child_signup", pe);
         navigate("/", { replace: true });

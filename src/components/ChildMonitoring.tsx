@@ -36,6 +36,7 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
       .from("child_links")
       .select("child_id,child_email")
       .eq("parent_id", parentUserId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: true });
     if (error) return;
     setLinks(data ?? []);
