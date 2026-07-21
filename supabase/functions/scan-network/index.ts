@@ -1,6 +1,9 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const VT_KEY = Deno.env.get('VIRUSTOTAL_API_KEY') ?? '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!;
 
 function clientIp(req: Request): string | null {
   const xf = req.headers.get('x-forwarded-for');
@@ -15,6 +18,22 @@ function isValidIp(s: string): boolean {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Not signed in' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: userData } = await supabase.auth.getUser(token);
+    if (!userData?.user) {
+      return new Response(JSON.stringify({ error: 'Not signed in' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     let ip: string | null = null;
     try {
       const body = await req.json().catch(() => ({}));

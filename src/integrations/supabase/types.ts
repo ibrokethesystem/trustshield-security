@@ -354,22 +354,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_siblings: {
-        Args: { _child: string }
-        Returns: {
-          child_email: string
-          child_id: string
-          label: string
-        }[]
-      }
+      find_parent_id_by_email: { Args: { _email: string }; Returns: string }
       is_parent_of: { Args: { _child: string }; Returns: boolean }
-      list_child_emails_for_parent: {
-        Args: { _parent_email: string }
-        Returns: {
-          child_email: string
-        }[]
-      }
-      my_parent_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       threat_severity: "low" | "medium" | "high" | "critical"
