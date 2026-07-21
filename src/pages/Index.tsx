@@ -3740,7 +3740,13 @@ function FamilyView({
 
   const displayName = (email: string) => {
     const label = childLabels[email.toLowerCase()];
-    return label ? `${label.replace(/-/g, " ")} · ${email}` : email;
+    // Older accounts stored slug-style labels ("alex-doe"); newer renames keep
+    // the raw text with capitals/symbols. Only substitute dashes when the label
+    // has no spaces (i.e. it's clearly the old slug form).
+    const pretty = label && !/\s/.test(label) && !/[A-Z]/.test(label)
+      ? label.replace(/-/g, " ")
+      : label;
+    return pretty ? `${pretty} · ${email}` : email;
   };
 
   const loadDeleted = useCallback(async () => {
