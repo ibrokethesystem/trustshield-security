@@ -310,13 +310,16 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       return;
     }
     if (userId) {
-      const { data, error } = await supabase
+      // Generate the id client-side so the vault also works when the lock is
+      // on (in that case RLS blocks the SELECT that would normally return the
+      // inserted row).
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+      const { error } = await supabase
         .from("vault_entries")
-        .insert({ user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() } as any)
-        .select()
-        .single();
-      if (error || !data) { toast.error("Couldn't save", { description: error?.message }); return; }
-      const entry: VaultEntry = { id: data.id, label: data.label, username: data.username ?? "", password: data.password, notes: data.notes ?? "", url: (data as any).url ?? "", updated_at: data.updated_at };
+        .insert({ id, user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() } as any);
+      if (error) { toast.error("Couldn't save", { description: error.message }); return; }
+      const entry: VaultEntry = { id, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), url: "", updated_at: now };
       const next = [entry, ...entries];
       setEntries(next); updateSummary(next);
       toast.success("Saved and synced to your account");
