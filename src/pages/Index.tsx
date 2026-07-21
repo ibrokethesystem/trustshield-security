@@ -61,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
+import trustShieldLogo from "@/assets/trust-shield-logo.png";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
@@ -586,9 +587,11 @@ const Index = () => {
       {/* Sidebar */}
       <aside className="w-64 shrink-0 border-r border-border bg-card/40 flex flex-col p-4 gap-2 sticky top-0 h-screen">
         <div className="flex items-center gap-3 px-2 py-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-shield flex items-center justify-center glow-shield">
-            <Shield className="w-6 h-6 text-primary-foreground" strokeWidth={2.5} />
-          </div>
+          <img
+            src={trustShieldLogo}
+            alt="Trust Shield logo"
+            className="w-10 h-10 rounded-xl object-contain"
+          />
           <div>
             <h1 className="font-bold text-base leading-tight">Trust Shield</h1>
             <p className="text-[11px] text-muted-foreground">Scam & Hack Detector</p>
