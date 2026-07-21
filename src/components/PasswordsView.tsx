@@ -142,7 +142,7 @@ async function deriveVaultKey(pin: string, saltHex: string): Promise<CryptoKey> 
     "raw", new TextEncoder().encode(pin), { name: "PBKDF2" }, false, ["deriveKey"]
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: 200_000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as BufferSource, iterations: 200_000, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: 256 },
     false,
@@ -154,7 +154,7 @@ async function encryptField(key: CryptoKey, plain: string): Promise<string> {
   if (!plain) return "";
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv }, key, new TextEncoder().encode(plain),
+    { name: "AES-GCM", iv: iv as BufferSource }, key, new TextEncoder().encode(plain) as BufferSource,
   ));
   return `${ENC_PREFIX}${bytesToB64(iv)}:${bytesToB64(ct)}`;
 }
@@ -167,7 +167,9 @@ async function decryptField(key: CryptoKey, value: string): Promise<string> {
   try {
     const iv = b64ToBytes(ivB64);
     const ct = b64ToBytes(ctB64);
-    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+    const pt = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: iv as BufferSource }, key, ct as BufferSource,
+    );
     return new TextDecoder().decode(pt);
   } catch {
     return "";
