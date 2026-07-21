@@ -2192,7 +2192,7 @@ function MyParentView({
                     key={r.id}
                     className="p-2 rounded-md border border-border bg-secondary/40 flex items-center justify-between gap-2 flex-wrap"
                   >
-                    <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                    <span className="font-mono break-all">{(r.note ?? "").split("\n")[0] || "(no site)"}</span>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded border uppercase tracking-wider ${statusBadge(r.status)}`}
                     >
