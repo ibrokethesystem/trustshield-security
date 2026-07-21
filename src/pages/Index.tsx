@@ -1056,7 +1056,7 @@ const Index = () => {
               {displayName || user.email}
             </button>
             <button
-              onClick={signOut}
+              onClick={requestSignOut}
               className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
               <LogOut className="w-3 h-3" /> Sign out
