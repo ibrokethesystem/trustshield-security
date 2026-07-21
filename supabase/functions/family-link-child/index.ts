@@ -35,32 +35,37 @@ Deno.serve(async (req) => {
     const parent = userData.user;
     const parentEmail = parent.email!.toLowerCase();
 
-    // Find every child user whose metadata pairs them to this parent email.
-    // Supports multi-child (labeled) accounts and legacy single-child.
-    const legacyEmail = await childEmailFor(parentEmail);
+    // SECURITY: only refresh child_links rows that the parent has already
+    // created for themselves. We do NOT auto-adopt accounts based on
+    // client-supplied user_metadata (role/parent_email are set by the child
+    // during sign-up and cannot be trusted). To add a new child, use the
+    // parent dashboard's "Set up child account" flow, which creates the
+    // link row directly with the parent's authenticated session.
+    const { data: existing, error: exErr } = await admin
+      .from("child_links")
+      .select("child_id, child_email, label")
+      .eq("parent_id", parent.id)
+      .is("deleted_at", null);
+    if (exErr) return json({ error: exErr.message }, 500);
+
     const matches: { id: string; email: string }[] = [];
-    for (let page = 1; page <= 20; page++) {
-      const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 });
-      if (error) break;
-      for (const u of data.users) {
-        const meta = (u.user_metadata ?? {}) as { parent_email?: string; role?: string };
-        const email = (u.email ?? "").toLowerCase();
-        const linkedByMeta =
-          (meta.parent_email ?? "").toLowerCase() === parentEmail && meta.role === "child";
-        const linkedByLegacy = email === legacyEmail;
-        if (linkedByMeta || linkedByLegacy) matches.push({ id: u.id, email: u.email ?? "" });
-      }
-      if (data.users.length < 200) break;
-    }
-    if (matches.length === 0) {
-      return json({ error: "No child account found for this parent email. Create one first from the dashboard." }, 404);
+    for (const row of existing ?? []) {
+      // Confirm the linked auth user is still a real child of this parent
+      // (metadata + role check) before reporting them as linked.
+      const { data: cu } = await admin.auth.admin.getUserById(row.child_id as string);
+      if (!cu?.user) continue;
+      const meta = (cu.user.user_metadata ?? {}) as { parent_email?: string; role?: string };
+      const isChildOfCaller =
+        (meta.parent_email ?? "").toLowerCase() === parentEmail && meta.role === "child";
+      if (!isChildOfCaller) continue;
+      matches.push({ id: cu.user.id, email: cu.user.email ?? "" });
     }
 
-    for (const m of matches) {
-      const { error: upErr } = await admin
-        .from("child_links")
-        .upsert({ parent_id: parent.id, child_id: m.id }, { onConflict: "child_id" });
-      if (upErr) return json({ error: upErr.message }, 500);
+    if (matches.length === 0) {
+      return json({
+        error:
+          "No child account is linked to this parent yet. Open your Trust Shield dashboard and use 'Set up child account' to create one.",
+      }, 404);
     }
 
     return json({ ok: true, linked: matches.length, children: matches });
