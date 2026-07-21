@@ -68,6 +68,35 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
   useEffect(() => { loadLinks(); }, [loadLinks]);
   useEffect(() => { if (selected) loadChildData(selected); }, [selected, loadChildData]);
 
+  // Realtime: notify the parent whenever a linked child visits a risky/blocked site.
+  useEffect(() => {
+    if (!links.length) return;
+    const childIds = new Set(links.map((l) => l.child_id));
+    const emailByChild = new Map(links.map((l) => [l.child_id, l.child_email ?? ""]));
+    const channel = supabase
+      .channel("child-activity-alerts")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "child_activity" },
+        (payload) => {
+          const row = payload.new as Activity & { user_id: string };
+          if (!childIds.has(row.user_id)) return;
+          const isRisky = row.blocked || (row.risk ?? 0) >= 30;
+          if (!isRisky) return;
+          const who = emailByChild.get(row.user_id) || "your child";
+          toast.error(`CHILD ALERT: ${row.host}`, {
+            description: `${who} tried to visit ${row.url}${row.blocked ? " (blocked)" : ` — risk ${row.risk}`}.`,
+            duration: 12000,
+          });
+          if (selected === row.user_id) loadChildData(row.user_id);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [links, selected, loadChildData]);
+
   const linkExisting = async () => {
     setLinking(true);
     try {
