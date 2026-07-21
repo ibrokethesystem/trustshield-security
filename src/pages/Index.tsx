@@ -3311,11 +3311,11 @@ function FamilyView({
       <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove child account?</AlertDialogTitle>
+            <AlertDialogTitle>Delete child account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This unlinks <span className="font-semibold">{confirmRemove}</span> from your family on this device and
-              clears their alerts from your inbox. The child's Trust Shield account itself is not deleted — they can
-              still sign in, but their alerts will no longer be forwarded to you.
+              This <span className="font-semibold">permanently deletes</span>{" "}
+              <span className="font-semibold">{confirmRemove}</span> — the child account, all of their browsing
+              history, banned sites, and family alerts. They will no longer be able to sign in. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3324,7 +3324,7 @@ function FamilyView({
               onClick={() => confirmRemove && removeChild(confirmRemove)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Remove
+              Delete forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
