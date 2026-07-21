@@ -464,6 +464,54 @@ const Index = () => {
     if (user) loadProfile();
   }, [user, loadProfile]);
 
+  // Role & family linking. On first sign-in after "Have a child?" flow, this user
+  // is marked as a child linked to a parent's email. Data lives in localStorage.
+  useEffect(() => {
+    if (!user) return;
+    const roleKey = `ts_role_${user.id}`;
+    const parentKey = `ts_parent_email_${user.id}`;
+    const pending = localStorage.getItem("ts_pending_child_signup");
+    if (pending && !localStorage.getItem(roleKey)) {
+      localStorage.setItem(roleKey, "child");
+      localStorage.setItem(parentKey, pending);
+      localStorage.removeItem("ts_pending_child_signup");
+      // Register this child under the parent's family index for discovery.
+      const idxKey = `ts_family_children_${pending}`;
+      const existing: string[] = JSON.parse(localStorage.getItem(idxKey) || "[]");
+      const email = user.email ?? "";
+      if (email && !existing.includes(email)) existing.push(email);
+      localStorage.setItem(idxKey, JSON.stringify(existing));
+    }
+    const storedRole = (localStorage.getItem(roleKey) as Role | null) ?? null;
+    const myEmail = (user.email ?? "").toLowerCase();
+    let nextRole: Role = storedRole ?? "solo";
+    // If this email is registered as a parent (a child pointed to it), auto-promote.
+    if (nextRole !== "child" && myEmail) {
+      const kids: string[] = JSON.parse(localStorage.getItem(`ts_family_children_${myEmail}`) || "[]");
+      if (kids.length > 0) nextRole = "parent";
+    }
+    localStorage.setItem(roleKey, nextRole);
+    localStorage.setItem("ts_role", nextRole); // shared for GuardianView / ThreatRow
+    setRole(nextRole);
+    setParentEmail(localStorage.getItem(parentKey) ?? "");
+  }, [user]);
+
+  const loadFamilyAlerts = useCallback(() => {
+    if (!user) return;
+    const myEmail = (user.email ?? "").toLowerCase();
+    if (!myEmail) return;
+    const raw = localStorage.getItem(`ts_family_alerts_${myEmail}`) || "[]";
+    try {
+      setFamilyAlerts(JSON.parse(raw));
+    } catch {
+      setFamilyAlerts([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (role === "parent") loadFamilyAlerts();
+  }, [role, view, loadFamilyAlerts]);
+
   const saveName = async () => {
     if (!user) return;
     const name = nameDraft.trim();
