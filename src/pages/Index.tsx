@@ -364,6 +364,11 @@ const Index = () => {
     if (n.key === "cyberedu" && role === "child" && eduDisabled) return false;
     return true;
   });
+  // If the parent turns CyberEdu off while the child is viewing it, bounce
+  // back to the dashboard so they don't stay on a hidden tab.
+  useEffect(() => {
+    if (role === "child" && eduDisabled && view === "cyberedu") setView("dashboard");
+  }, [role, eduDisabled, view]);
   // Dev feature auto-removes at v2.5.0 per spec.
   const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
   const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
