@@ -336,7 +336,9 @@ const Index = () => {
   // Features gated by the active version marker. Reverting to an older version hides them.
   const showInbox = hasFeature("1.9.5");
   const showThreatRadar = hasFeature("1.9.3");
-  const showVersionPill = hasFeature("1.9.6");
+  // Always show the version pill so the user can always return to the latest,
+  // even after reverting to a release older than when the pill was introduced.
+  const showVersionPill = true;
   const visibleNavItems = navItems.filter((n) => {
     if (n.minVersion && !hasFeature(n.minVersion)) return false;
     if (role === "child" && n.hideForChild) return false;
