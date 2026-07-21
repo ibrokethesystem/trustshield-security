@@ -200,7 +200,8 @@ type ViewKey =
   | "files"
   | "qr"
   | "family"
-  | "cyberedu";
+  | "cyberedu"
+  | "myparent";
 const navItems: {
   key: ViewKey;
   label: string;
@@ -214,6 +215,7 @@ const navItems: {
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "family", label: "Family", icon: Users, parentOnly: true },
   { key: "cyberedu", label: "CyberEdu", icon: GraduationCap, childOnly: true, minVersion: "2.0.0" },
+  { key: "myparent", label: "My parent", icon: User, childOnly: true, minVersion: "2.0.0" },
   { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
   { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2", hideForChild: true },
   { key: "network", label: "Network safety", icon: Wifi, hideForChild: true },
@@ -1564,6 +1566,8 @@ const Index = () => {
           />
         ) : view === "cyberedu" ? (
           <CyberEduView userId={user?.id} />
+        ) : view === "myparent" ? (
+          <MyParentView parentEmail={parentEmail} childEmail={user?.email ?? ""} />
         ) : (
           <GuardianView
             threats={threats ?? []}
@@ -1842,6 +1846,55 @@ function SecurityScoreCard({ score }: { score: number }) {
 
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
+}
+
+function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childEmail: string }) {
+  const hasParent = !!parentEmail;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Users className="w-6 h-6 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold">My parent</h2>
+            <p className="text-sm text-muted-foreground">
+              This is the grown-up who set up your Trust Shield account. They can see alerts about scary stuff you
+              run into and help keep you safe.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          <div className="p-4 rounded-xl bg-secondary/40 border border-border">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Your grown-up</div>
+            {hasParent ? (
+              <div className="text-lg font-semibold mt-1 break-all">{parentEmail}</div>
+            ) : (
+              <div className="text-sm text-muted-foreground mt-1">
+                We couldn't find a linked parent yet. Ask a grown-up to open Trust Shield and check the Family tab.
+              </div>
+            )}
+          </div>
+          <div className="p-4 rounded-xl bg-secondary/40 border border-border">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Your account</div>
+            <div className="text-sm mt-1 break-all">{childEmail || "—"}</div>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/30 text-xs">
+          <div className="font-semibold mb-1">Tips for staying safe</div>
+          <ul className="space-y-1 text-muted-foreground">
+            <li>• If something online feels weird, tell your grown-up.</li>
+            <li>• Don't share passwords — not even with friends.</li>
+            <li>• Never share your address, school, or phone number with strangers.</li>
+            <li>• Your parent gets a note when Trust Shield sees something dangerous.</li>
+          </ul>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function ScanHistoryView({
@@ -3227,8 +3280,28 @@ function FamilyView({
 
   const removeAllChildren = async () => {
     setConfirmRemoveAll(false);
-    if (children.length === 0) return;
-    const list = [...children];
+    // Gather every child linked to this parent — both local state AND any
+    // rows in child_links that this device doesn't know about (e.g. added
+    // from another device). We rely on RLS + parent_id to scope to us.
+    const collected = new Set<string>(children.map((c) => c.toLowerCase()));
+    if (parentUserId) {
+      try {
+        const { data } = await supabase
+          .from("child_links")
+          .select("child_email")
+          .eq("parent_id", parentUserId);
+        (data ?? []).forEach((row: { child_email?: string | null }) => {
+          if (row.child_email) collected.add(row.child_email.toLowerCase());
+        });
+      } catch {
+        /* fall back to local-only list */
+      }
+    }
+    const list = Array.from(collected);
+    if (list.length === 0) {
+      toast("No child accounts linked to delete");
+      return;
+    }
     let failed: string[] = [];
     for (const childEmail of list) {
       try {
