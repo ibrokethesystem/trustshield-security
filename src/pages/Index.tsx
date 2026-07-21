@@ -3727,7 +3727,8 @@ function FamilyView({
     // Side effect: for approved unblock_site, remove the row from child_banned_sites
     // so the child's extension stops blocking it on next sync.
     if (approve && extra?.kind === "unblock_site" && extra.note && extra.child_id) {
-      const host = extra.note.trim().toLowerCase();
+      // Note format: "<host>\n<reason>" (older rows may only contain the host).
+      const host = extra.note.split("\n")[0].trim().toLowerCase();
       const { error: delErr } = await supabase
         .from("child_banned_sites")
         .delete()
