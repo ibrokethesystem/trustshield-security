@@ -800,6 +800,34 @@ const Index = () => {
     navigate("/auth", { replace: true });
   };
 
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signOutPassword, setSignOutPassword] = useState("");
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const requestSignOut = () => {
+    if (role === "child") {
+      setSignOutPassword("");
+      setSignOutOpen(true);
+    } else {
+      void signOut();
+    }
+  };
+  const confirmChildSignOut = async () => {
+    if (!user?.email || !signOutPassword) return;
+    setSignOutBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: signOutPassword,
+    });
+    setSignOutBusy(false);
+    if (error) {
+      toast.error("Wrong password", { description: "Ask your parent for help." });
+      return;
+    }
+    setSignOutOpen(false);
+    setSignOutPassword("");
+    await signOut();
+  };
+
   const startChildSignup = async () => {
     if (!user?.email) {
       toast.error("Sign in first");
