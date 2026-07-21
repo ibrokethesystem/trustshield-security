@@ -72,7 +72,7 @@ import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { childEmailFor } from "@/lib/childAuth";
+import { childEmailFor, childLabelSlug } from "@/lib/childAuth";
 import { ChildMonitoring } from "@/components/ChildMonitoring";
 import {
   AlertDialog,
