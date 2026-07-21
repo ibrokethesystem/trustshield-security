@@ -3772,7 +3772,7 @@ function FamilyView({
               you when something suspicious shows up.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={onRefresh}>
+          <Button variant="outline" size="sm" onClick={() => { onRefresh(); void loadLabels(); void loadRequests(); }}>
             Refresh
           </Button>
           {children.length > 0 && (
