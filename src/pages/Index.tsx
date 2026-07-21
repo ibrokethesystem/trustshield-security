@@ -3827,10 +3827,6 @@ function FamilyView({
             </p>
             <ul className="text-xs space-y-2">
               {pendingRequests.map((r) => {
-                const child = children.find(() => false); // resolved below via label lookup
-                void child;
-                const label = Object.entries(childLabels).find(([, lab]) => lab && r.child_id)?.[1];
-                void label;
                 return (
                   <li
                     key={r.id}
