@@ -1021,6 +1021,8 @@ const Index = () => {
           />
         ) : view === "network" ? (
           <NetworkScanView />
+        ) : view === "qr" ? (
+          <QrScannerView />
         ) : view === "passwords" ? (
           <PasswordsView
             userId={user?.id}
