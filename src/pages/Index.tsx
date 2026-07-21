@@ -257,6 +257,59 @@ const Index = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
+  const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("ts_dev_unlocked") === "1";
+  });
+  const [devInput, setDevInput] = useState("");
+  const [selectedVersion, setSelectedVersion] = useState<string>(() => {
+    if (typeof window === "undefined") return UPDATES[0]?.version ?? "2.0.0";
+    return localStorage.getItem("ts_active_version") || (UPDATES[0]?.version ?? "2.0.0");
+  });
+  const latestVersion = UPDATES[0]?.version ?? "2.0.0";
+  const cmpVersion = (a: string, b: string) => {
+    const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+    }
+    return 0;
+  };
+  // Dev feature auto-removes at v2.5.0 per spec.
+  const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
+  const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
+  const visibleVersions = UPDATES.filter((u) =>
+    effectiveDevUnlocked ? true : cmpVersion(u.version, "2.0.0") >= 0,
+  );
+  const applyVersion = (v: string) => {
+    setSelectedVersion(v);
+    localStorage.setItem("ts_active_version", v);
+    setVersionMenuOpen(false);
+    if (v === latestVersion) {
+      toast.success(`On the latest version (v${v})`);
+    } else {
+      toast(`Reverted to v${v}`, {
+        description: "This is a UI-level version marker — code stays on the latest build.",
+      });
+    }
+  };
+  const tryDevUnlock = () => {
+    if (devInput === "TrustShieldDevs1357908642)*^$@!#%&(") {
+      localStorage.setItem("ts_dev_unlocked", "1");
+      setDevUnlocked(true);
+      setDevInput("");
+      toast.success("Developer mode unlocked — all past versions visible.");
+    } else {
+      toast.error("Incorrect developer code");
+    }
+  };
+  useEffect(() => {
+    if (devUnlocked && !devFeatureAvailable) {
+      localStorage.removeItem("ts_dev_unlocked");
+      setDevUnlocked(false);
+    }
+  }, [devUnlocked, devFeatureAvailable]);
   const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("ts_last_read_update") ?? null;
