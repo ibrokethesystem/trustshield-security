@@ -651,7 +651,28 @@ const Index = () => {
         .select("id")
         .maybeSingle();
       if (analysis.is_threat) {
-        toast.error("Threat detected", { description: analysis.title });
+        toast.error("Threat detected", {
+          description:
+            role === "child"
+              ? `${analysis.title} — Please tell a trusted adult and don't click anything.`
+              : analysis.title,
+        });
+        // Child accounts: forward this alert to the parent's local family inbox.
+        if (role === "child" && parentEmail && user) {
+          try {
+            const key = `ts_family_alerts_${parentEmail.toLowerCase()}`;
+            const list = JSON.parse(localStorage.getItem(key) || "[]");
+            list.unshift({
+              id: crypto.randomUUID(),
+              child_email: user.email ?? "",
+              title: analysis.title,
+              severity: analysis.severity ?? "medium",
+              created_at: new Date().toISOString(),
+              summary: analysis.summary ?? "",
+            });
+            localStorage.setItem(key, JSON.stringify(list.slice(0, 100)));
+          } catch { /* no-op */ }
+        }
         setScanText("");
         setScanImage(null);
         await loadThreats();
