@@ -66,6 +66,7 @@ import trustShieldLogo from "@/assets/trust-shield-logo.png";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
+import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
@@ -281,6 +282,8 @@ const Index = () => {
   const [familyAlerts, setFamilyAlerts] = useState<
     { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
   >([]);
+  const [childDialogOpen, setChildDialogOpen] = useState(false);
+  const [childBusy, setChildBusy] = useState(false);
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -766,6 +769,28 @@ const Index = () => {
     navigate("/auth", { replace: true });
   };
 
+  const startChildSignup = async () => {
+    if (!user?.email) {
+      toast.error("Sign in first");
+      return;
+    }
+    setChildBusy(true);
+    localStorage.setItem("ts_pending_child_signup", user.email.toLowerCase());
+    // Sign the parent out so Google shows the account chooser for the child.
+    await supabase.auth.signOut();
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+      extraParams: { prompt: "select_account" },
+    });
+    if (result.error) {
+      localStorage.removeItem("ts_pending_child_signup");
+      toast.error("Google sign-in failed", { description: result.error.message });
+      setChildBusy(false);
+      return;
+    }
+    // Redirect handles the rest.
+  };
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1080,6 +1105,28 @@ const Index = () => {
               />
             </div>
 
+            {role !== "child" && (
+              <Card>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm">Have a child?</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Set up a monitored child account. Their alerts land in your Family tab and risky tabs are hidden from them.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setChildDialogOpen(true)}
+                    className="bg-gradient-shield hover:opacity-90 glow-shield"
+                  >
+                    <Users className="w-4 h-4 mr-2" /> Set up child account
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {/* Trend chart */}
             <Card>
               <div className="flex items-center justify-between mb-3">
@@ -1323,6 +1370,36 @@ const Index = () => {
       </main>
 
       {/* Profile dialog */}
+      <Dialog open={childDialogOpen} onOpenChange={(o) => !childBusy && setChildDialogOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set up child account</DialogTitle>
+            <DialogDescription>
+              We'll sign you out and open Google so your child can sign in with their own Google account.
+              Their new account will be linked to yours ({user?.email}) — their alerts appear in your Family tab,
+              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
+            Pick your child's Google account on the next screen. When it finishes, sign back in with your own
+            Google account (or email/password) to see their alerts in the Family tab.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChildDialogOpen(false)} disabled={childBusy}>
+              Cancel
+            </Button>
+            <Button
+              onClick={startChildSignup}
+              disabled={childBusy}
+              className="bg-gradient-shield hover:opacity-90 glow-shield"
+            >
+              {childBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
+              Continue with Google
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
         <DialogContent>
           <DialogHeader>
