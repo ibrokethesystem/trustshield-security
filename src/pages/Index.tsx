@@ -3172,13 +3172,23 @@ function FamilyView({
       const { data: link } = await supabase
         .from("child_links")
         .select("child_id")
-        .eq("child_email", childEmail)
+        .eq("parent_id", parentUserId ?? "")
+        .ilike("child_email", childEmail)
         .maybeSingle();
       const childId = link?.child_id as string | undefined;
       if (childId) {
         await supabase.from("child_activity").delete().eq("user_id", childId);
         await supabase.from("child_banned_sites").delete().eq("user_id", childId);
         await supabase.from("child_links").delete().eq("child_id", childId);
+      } else {
+        // Fallback: no link row found by email (case/whitespace mismatch or
+        // link already gone). Best-effort: drop any link rows this parent has
+        // matching that email so the monitor stops showing the child.
+        await supabase
+          .from("child_links")
+          .delete()
+          .eq("parent_id", parentUserId ?? "")
+          .ilike("child_email", childEmail);
       }
     } catch {
       /* non-fatal */
