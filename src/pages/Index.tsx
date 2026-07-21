@@ -3258,6 +3258,16 @@ function FamilyView({
                 Unzip on the child's computer → open <code>chrome://extensions</code> or{" "}
                 <code>edge://extensions</code> → enable Developer mode → "Load unpacked".
               </p>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                Don't know how get the child extension?{" "}
+                <button
+                  type="button"
+                  className="text-primary underline underline-offset-2 hover:opacity-80"
+                  onClick={() => onAskGuardian?.()}
+                >
+                  Ask Cyber Guardian!
+                </button>
+              </p>
             </div>
           </div>
         </div>
