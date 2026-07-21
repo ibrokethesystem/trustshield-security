@@ -68,6 +68,7 @@ import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { childEmailFor } from "@/lib/childAuth";
 
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
 
