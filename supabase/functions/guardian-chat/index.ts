@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
     const mode: string = typeof body.mode === 'string' ? body.mode : (threatId ? 'threat' : 'general');
     const messages: Msg[] = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
     const vaultSummary = body.vault_summary && typeof body.vault_summary === 'object' ? body.vault_summary : null;
+    const audience: 'child' | 'adult' = body.audience === 'child' ? 'child' : 'adult';
     if (messages.length === 0) return json({ error: 'Empty conversation' }, 400);
 
     const stringify = (v: unknown): string => {
@@ -80,6 +81,10 @@ Deno.serve(async (req) => {
         ? `The user is asking general online-safety questions. Answer helpfully and concretely.`
         : `Answer ONLY about this single threat and general online-safety guidance.`;
 
+    const childPreamble = audience === 'child'
+      ? `\n\nAUDIENCE: This user is a CHILD on a monitored child account. Rules for you:\n- Use very simple, kind language a 9–12 year old can understand. Short sentences.\n- ALWAYS end scary or uncertain answers with: "Tell a trusted adult (like a parent, teacher, or guardian) right away."\n- Never tell the child to open Terminal, edit system settings, change passwords for someone else, install anti-virus software, disable protections, or share personal information.\n- Do NOT talk about the Passwords vault, File scanner, Network safety, or Extensions tabs — they are hidden for child accounts.\n- If the child says they were hacked, scammed, threatened, or someone online asked for pictures / money / to meet in person: tell them to stop replying, not click anything, and tell a trusted adult immediately. Suggest closing the tab.\n- Be reassuring. Not scary. Never blame them.`
+      : '';
+
     const systemPrompt = `You are Cyber Guardian, the friendly AI assistant inside Trust Shield. You help everyday users stay safe online.
 Rules:
 - Explain in plain language. No jargon unless you define it in the same sentence.
@@ -87,7 +92,7 @@ Rules:
 - Trust Shield is a web app; it cannot reach into the user's OS, email, or accounts. Do not promise device-level actions.
 - Keep replies focused, 1-5 short paragraphs or a short numbered list when giving steps.
 - IMPORTANT: Trust Shield DOES ship a Microsoft Edge extension. If the user asks whether an Edge extension exists, say YES and give them the install steps below. Never say Trust Shield only has a Chrome extension.
-
+${childPreamble}
 ${modeGuidance}
 
 ABOUT TRUST SHIELD (facts about this app — use these when the user asks what Trust Shield can do):
