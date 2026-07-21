@@ -2495,6 +2495,12 @@ function ThreatRow({
           threat_id: threat.id,
           messages: next,
           audience: (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
+          active_version:
+            (typeof window !== "undefined" && localStorage.getItem("ts_active_version")) ||
+            (UPDATES[0]?.version ?? "2.0.0"),
+          updates: UPDATES.map((u) => ({
+            version: u.version, date: u.date, name: u.name, summary: u.summary,
+          })),
         },
       });
       if (error) throw error;
@@ -2868,6 +2874,12 @@ function GuardianView({
               return raw ? JSON.parse(raw) : null;
             } catch { return null; }
           })(),
+          active_version:
+            (typeof window !== "undefined" && localStorage.getItem("ts_active_version")) ||
+            (UPDATES[0]?.version ?? "2.0.0"),
+          updates: UPDATES.map((u) => ({
+            version: u.version, date: u.date, name: u.name, summary: u.summary,
+          })),
         },
       });
       if (error) throw error;
