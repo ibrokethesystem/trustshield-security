@@ -29,6 +29,24 @@ Deno.serve(async (req) => {
     const password = String(body?.password ?? "");
     if (password.length < 4) return json({ error: "Enter your password." }, 400);
 
+    // Require parent approval — an approved `delete_account` permission request
+    // must exist for this child before we honor the deletion.
+    const { data: approved, error: reqErr } = await admin
+      .from("permission_requests")
+      .select("id")
+      .eq("child_id", me.id)
+      .eq("kind", "delete_account")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (reqErr) return json({ error: reqErr.message }, 500);
+    if (!approved || approved.length === 0) {
+      return json(
+        { error: "Your grown-up hasn't approved this yet. Ask them to say yes in their Family tab." },
+        403,
+      );
+    }
+
     // Verify the password by signing in with a throwaway client.
     const verifier = createClient(url, anon, { auth: { persistSession: false } });
     const { error: vErr } = await verifier.auth.signInWithPassword({
@@ -40,6 +58,7 @@ Deno.serve(async (req) => {
     const childId = me.id;
     await admin.from("child_activity").delete().eq("user_id", childId);
     await admin.from("child_banned_sites").delete().eq("user_id", childId);
+    await admin.from("permission_requests").delete().eq("child_id", childId);
     await admin.from("child_links").delete().eq("child_id", childId);
     await admin.from("profiles").delete().eq("id", childId);
     const { error: dErr } = await admin.auth.admin.deleteUser(childId);

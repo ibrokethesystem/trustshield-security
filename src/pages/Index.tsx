@@ -72,7 +72,7 @@ import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { childEmailFor } from "@/lib/childAuth";
+import { childEmailFor, childLabelSlug } from "@/lib/childAuth";
 import { ChildMonitoring } from "@/components/ChildMonitoring";
 import {
   AlertDialog,
@@ -316,6 +316,7 @@ const Index = () => {
   const [childBusy, setChildBusy] = useState(false);
   const [childPassword, setChildPassword] = useState("");
   const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
+  const [childName, setChildName] = useState("");
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -875,6 +876,16 @@ const Index = () => {
       toast.error("Sign in first");
       return;
     }
+    const labelRaw = childName.trim();
+    if (!labelRaw) {
+      toast.error("Give this child a name so you can add more later");
+      return;
+    }
+    const label = childLabelSlug(labelRaw);
+    if (!label) {
+      toast.error("Please use letters or numbers in the child's name");
+      return;
+    }
     if (childPassword.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -888,14 +899,29 @@ const Index = () => {
     const { data: parentSessionData } = await supabase.auth.getSession();
     const parentSession = parentSessionData.session;
     const parentEmailLower = user.email.toLowerCase();
-    const email = await childEmailFor(parentEmailLower);
+    // Prevent duplicate labels for the same parent.
+    try {
+      const { data: existingLabels } = await supabase
+        .from("child_links")
+        .select("label")
+        .eq("parent_id", user.id)
+        .is("deleted_at", null);
+      if ((existingLabels ?? []).some((r) => (r.label ?? "").toLowerCase() === label)) {
+        toast.error("You already have a child with that name", {
+          description: "Pick a different name (or password + name pair) for this child.",
+        });
+        setChildBusy(false);
+        return;
+      }
+    } catch { /* non-fatal */ }
+    const email = await childEmailFor(parentEmailLower, label);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: childPassword,
         options: {
           emailRedirectTo: window.location.origin,
-          data: { role: "child", parent_email: parentEmailLower },
+          data: { role: "child", parent_email: parentEmailLower, child_label: label, child_name: labelRaw },
         },
       });
       if (error) {
@@ -908,11 +934,11 @@ const Index = () => {
         if (siErr) {
           // Password differs — sign in with a temporary reset isn't available client-side; ask parent to use existing password.
           throw new Error(
-            "A child account already exists for this parent email. Sign in on the child's device using the password you set previously, or contact support to reset it."
+            `A child account with name "${labelRaw}" already exists for this parent email. Either pick a different name, or sign in on that child's device using the password you set previously.`
           );
         }
         await supabase.auth.updateUser({
-          data: { role: "child", parent_email: parentEmailLower },
+          data: { role: "child", parent_email: parentEmailLower, child_label: label, child_name: labelRaw },
         });
         if (parentSession) {
           await supabase.auth.setSession({
@@ -925,6 +951,7 @@ const Index = () => {
         });
         setChildPassword("");
         setChildPasswordConfirm("");
+        setChildName("");
         setChildDialogOpen(false);
         setChildBusy(false);
         return;
@@ -954,7 +981,7 @@ const Index = () => {
           await supabase
             .from("child_links")
             .upsert(
-              { parent_id: user.id, child_id: childId, child_email: email },
+              { parent_id: user.id, child_id: childId, child_email: email, label },
               { onConflict: "child_id" },
             );
         } catch { /* non-fatal */ }
@@ -963,11 +990,12 @@ const Index = () => {
       localStorage.setItem(`ts_role_${user.id}`, "parent");
       localStorage.setItem("ts_role", "parent");
       setRole("parent");
-      toast.success("Child account created", {
-        description: `On the child's device, choose "Child" on the login page and sign in with your email (${parentEmailLower}) and the password you just set.`,
+      toast.success(`Child account created for ${labelRaw}`, {
+        description: `On the child's device, choose "Child" on the login page and sign in with your email (${parentEmailLower}), the name "${labelRaw}", and the password you just set.`,
       });
       setChildPassword("");
       setChildPasswordConfirm("");
+      setChildName("");
       setChildDialogOpen(false);
     } catch (err) {
       // Best-effort restore of parent session on failure.
@@ -1568,7 +1596,11 @@ const Index = () => {
         ) : view === "cyberedu" ? (
           <CyberEduView userId={user?.id} />
         ) : view === "myparent" ? (
-          <MyParentView parentEmail={parentEmail} childEmail={user?.email ?? ""} />
+          <MyParentView
+            parentEmail={parentEmail}
+            childEmail={user?.email ?? ""}
+            childUserId={user?.id}
+          />
         ) : (
           <GuardianView
             threats={threats ?? []}
@@ -1588,16 +1620,31 @@ const Index = () => {
           <DialogHeader>
             <DialogTitle>Set up child account</DialogTitle>
             <DialogDescription>
-              Create your child's Trust Shield account right now. You choose the password, then sign in on their
-              device with it. Their account will be linked to yours ({user?.email}) — alerts appear in your Family
-              tab, and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+              Create your child's Trust Shield account right now. You choose the name and password, then sign in on
+              their device with it. You can set up more than one child — just use a different name and password for
+              each one. Their account will be linked to yours ({user?.email}) — alerts appear in your Family tab,
+              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
-              Your child will sign in on their device using <span className="text-foreground font-medium">{user?.email}</span> as
-              the parent email and the password you choose below. Trust Shield handles the actual account behind the scenes — no
-              extra email needed.
+              Your child will sign in on their device using <span className="text-foreground font-medium">{user?.email}</span>
+              {" "}as the parent email, the name you pick below, and the password you choose. Trust Shield handles
+              the actual account behind the scenes — no extra email needed.
+            </div>
+            <div>
+              <Label htmlFor="child-name">Child's name</Label>
+              <Input
+                id="child-name"
+                value={childName}
+                onChange={(e) => setChildName(e.target.value)}
+                placeholder="e.g. Alex"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Each child on your account needs a different name (and different password).
+              </p>
             </div>
             <div>
               <Label htmlFor="child-password">Choose a password</Label>
@@ -1846,11 +1893,86 @@ function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-card border border-border rounded-2xl p-5">{children}</div>;
 }
 
-function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childEmail: string }) {
+function MyParentView({
+  parentEmail,
+  childEmail,
+  childUserId,
+}: {
+  parentEmail: string;
+  childEmail: string;
+  childUserId?: string;
+}) {
   const hasParent = !!parentEmail;
   const [pwd, setPwd] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [siblings, setSiblings] = useState<{ child_id: string; child_email: string; label: string | null }[]>([]);
+  const [requests, setRequests] = useState<
+    { id: string; kind: string; status: string; created_at: string; resolved_at: string | null }[]
+  >([]);
+  const [reqBusy, setReqBusy] = useState(false);
+
+  const loadSiblings = useCallback(async () => {
+    if (!childUserId) return;
+    const { data } = await supabase.rpc("get_siblings", { _child: childUserId });
+    setSiblings((data ?? []) as { child_id: string; child_email: string; label: string | null }[]);
+  }, [childUserId]);
+
+  const loadRequests = useCallback(async () => {
+    if (!childUserId) return;
+    const { data } = await supabase
+      .from("permission_requests")
+      .select("id, kind, status, created_at, resolved_at")
+      .eq("child_id", childUserId)
+      .order("created_at", { ascending: false });
+    setRequests((data ?? []) as typeof requests);
+  }, [childUserId]);
+
+  useEffect(() => { void loadSiblings(); void loadRequests(); }, [loadSiblings, loadRequests]);
+
+  const activeRequestOfKind = (kind: string) =>
+    requests.find((r) => r.kind === kind && (r.status === "pending" || r.status === "approved"));
+  const approvedDeleteReq = requests.find((r) => r.kind === "delete_account" && r.status === "approved");
+  const removalReq = activeRequestOfKind("remove_extension");
+
+  const requestPermission = async (kind: "delete_account" | "remove_extension") => {
+    if (!childUserId) return;
+    setReqBusy(true);
+    try {
+      // Look up parent_id via child_links
+      const { data: link } = await supabase
+        .from("child_links")
+        .select("parent_id")
+        .eq("child_id", childUserId)
+        .maybeSingle();
+      if (!link?.parent_id) {
+        toast.error("Couldn't find your parent account");
+        return;
+      }
+      // Cancel any prior pending request of the same kind so we don't spam.
+      await supabase
+        .from("permission_requests")
+        .delete()
+        .eq("child_id", childUserId)
+        .eq("kind", kind)
+        .eq("status", "pending");
+      const { error } = await supabase.from("permission_requests").insert({
+        parent_id: link.parent_id,
+        child_id: childUserId,
+        kind,
+      });
+      if (error) {
+        toast.error("Couldn't send request", { description: error.message });
+        return;
+      }
+      toast.success("Sent to your grown-up", {
+        description: "They'll see it in their Family tab and can say yes or no.",
+      });
+      await loadRequests();
+    } finally {
+      setReqBusy(false);
+    }
+  };
 
   const deleteSelf = async () => {
     setDeleting(true);
@@ -1875,6 +1997,15 @@ function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childE
       setDeleting(false);
     }
   };
+
+  const kindLabel = (k: string) =>
+    k === "delete_account" ? "Delete my account" : k === "remove_extension" ? "Remove browser extension" : k;
+  const statusBadge = (s: string) =>
+    s === "approved"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+      : s === "denied"
+      ? "bg-destructive/10 text-destructive border-destructive/40"
+      : "bg-yellow-500/10 text-yellow-400 border-yellow-500/30";
 
   return (
     <div className="space-y-4">
@@ -1907,6 +2038,28 @@ function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childE
             <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Your account</div>
             <div className="text-sm mt-1 break-all">{childEmail || "—"}</div>
           </div>
+          <div className="p-4 rounded-xl bg-secondary/40 border border-border">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Your brothers &amp; sisters ({siblings.length})
+            </div>
+            {siblings.length === 0 ? (
+              <div className="text-sm text-muted-foreground mt-1">
+                No other kids are linked to your grown-up right now.
+              </div>
+            ) : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {siblings.map((s) => (
+                  <li key={s.child_id} className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-primary" />
+                    <span className="font-medium">
+                      {s.label ? s.label.replace(/-/g, " ") : "Sibling"}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground break-all">({s.child_email})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/30 text-xs">
@@ -1922,33 +2075,101 @@ function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childE
 
       <Card>
         <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Puzzle className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold">Remove the browser extension</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              You need your grown-up's permission before you can take Trust Shield out of your browser. Send them a
+              request and wait for them to say yes.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          {removalReq ? (
+            <span
+              className={`text-[11px] px-2 py-1 rounded border uppercase tracking-wider ${statusBadge(removalReq.status)}`}
+            >
+              {removalReq.status === "approved" ? "Approved" : "Waiting for your grown-up"}
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={reqBusy || !childUserId}
+              onClick={() => requestPermission("remove_extension")}
+            >
+              Ask permission to remove
+            </Button>
+          )}
+        </div>
+        {removalReq?.status === "approved" && (
+          <div className="mt-3 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/30 text-xs">
+            <div className="font-semibold text-emerald-400 mb-1">You're allowed to remove it</div>
+            Open <code>chrome://extensions</code> or <code>edge://extensions</code>, find <b>Trust Shield</b>, and
+            click <b>Remove</b>. When you're done, tell your grown-up so they know.
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center justify-center">
             <Trash2 className="w-5 h-5 text-destructive" />
           </div>
           <div className="flex-1">
             <h3 className="font-semibold">Delete my account</h3>
             <p className="text-xs text-muted-foreground mt-1">
-              This erases your Trust Shield account, your searches, and your banned sites forever. Enter your
-              password to confirm. Once you press delete, you can't get it back — even your grown-up can't undo this.
+              You need your grown-up's permission before you can delete your account. Send them a request; once they
+              approve it, come back here, enter your password, and confirm. This can't be undone.
             </p>
           </div>
         </div>
+        {!approvedDeleteReq && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            {activeRequestOfKind("delete_account") ? (
+              <span
+                className={`text-[11px] px-2 py-1 rounded border uppercase tracking-wider ${statusBadge(
+                  activeRequestOfKind("delete_account")!.status,
+                )}`}
+              >
+                Waiting for your grown-up
+              </span>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={reqBusy || !childUserId}
+                onClick={() => requestPermission("delete_account")}
+              >
+                Ask permission to delete
+              </Button>
+            )}
+          </div>
+        )}
         <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto] max-w-md">
           <PasswordInput
             value={pwd}
             onChange={(e) => setPwd(e.target.value)}
             placeholder="Your password"
             autoComplete="current-password"
+            disabled={!approvedDeleteReq}
           />
           <Button
             variant="destructive"
-            disabled={deleting || pwd.length < 4}
+            disabled={deleting || pwd.length < 4 || !approvedDeleteReq}
             onClick={() => setConfirmOpen(true)}
           >
             {deleting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
             Delete my account
           </Button>
         </div>
+        {!approvedDeleteReq && (
+          <p className="text-[11px] text-muted-foreground mt-2">
+            The password box unlocks after your grown-up approves the request.
+          </p>
+        )}
       </Card>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -3311,6 +3532,55 @@ function FamilyView({
   const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
   const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
   const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
+  const [childLabels, setChildLabels] = useState<Record<string, string>>({});
+  const [pendingRequests, setPendingRequests] = useState<
+    { id: string; kind: string; status: string; created_at: string; child_id: string }[]
+  >([]);
+
+  const loadLabels = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("child_links")
+      .select("child_email, label")
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    const map: Record<string, string> = {};
+    (data ?? []).forEach((r) => {
+      if (r.child_email && r.label) map[r.child_email.toLowerCase()] = r.label;
+    });
+    setChildLabels(map);
+  }, [parentUserId]);
+
+  const loadRequests = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("permission_requests")
+      .select("id, kind, status, created_at, child_id")
+      .eq("parent_id", parentUserId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setPendingRequests((data ?? []) as typeof pendingRequests);
+  }, [parentUserId]);
+
+  useEffect(() => { void loadLabels(); void loadRequests(); }, [loadLabels, loadRequests]);
+
+  const decideRequest = async (id: string, approve: boolean) => {
+    const { error } = await supabase
+      .from("permission_requests")
+      .update({ status: approve ? "approved" : "denied", resolved_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) {
+      toast.error("Couldn't update request", { description: error.message });
+      return;
+    }
+    toast.success(approve ? "Request approved" : "Request denied");
+    await loadRequests();
+  };
+
+  const displayName = (email: string) => {
+    const label = childLabels[email.toLowerCase()];
+    return label ? `${label.replace(/-/g, " ")} · ${email}` : email;
+  };
 
   const loadDeleted = useCallback(async () => {
     if (!parentUserId) return;
@@ -3502,7 +3772,7 @@ function FamilyView({
               you when something suspicious shows up.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={onRefresh}>
+          <Button variant="outline" size="sm" onClick={() => { onRefresh(); void loadLabels(); void loadRequests(); }}>
             Refresh
           </Button>
           {children.length > 0 && (
@@ -3529,7 +3799,7 @@ function FamilyView({
             <ul className="text-xs space-y-1">
               {children.map((c) => (
                 <li key={c} className="flex items-center justify-between gap-2 group">
-                  <span className="text-muted-foreground truncate">• {c}</span>
+                  <span className="text-muted-foreground truncate">• {displayName(c)}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -3544,6 +3814,60 @@ function FamilyView({
             </ul>
           )}
         </div>
+
+        {pendingRequests.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-400" />
+              <div className="text-xs font-semibold">Permission requests ({pendingRequests.length})</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Your children need your OK before they can delete their account or take Trust Shield out of their
+              browser. Approve or deny each request below.
+            </p>
+            <ul className="text-xs space-y-2">
+              {pendingRequests.map((r) => {
+                return (
+                  <li
+                    key={r.id}
+                    className="p-2 rounded-md border border-border bg-card/40 flex items-center justify-between gap-2 flex-wrap"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">
+                        {r.kind === "delete_account"
+                          ? "Delete their Trust Shield account"
+                          : r.kind === "remove_extension"
+                          ? "Remove the browser extension"
+                          : r.kind}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Requested {new Date(r.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-emerald-400 hover:text-emerald-400"
+                        onClick={() => decideRequest(r.id, true)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-destructive hover:text-destructive"
+                        onClick={() => decideRequest(r.id, false)}
+                      >
+                        Deny
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/30">
           <div className="flex items-start gap-3">
