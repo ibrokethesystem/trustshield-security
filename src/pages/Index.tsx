@@ -3799,7 +3799,7 @@ function FamilyView({
             <ul className="text-xs space-y-1">
               {children.map((c) => (
                 <li key={c} className="flex items-center justify-between gap-2 group">
-                  <span className="text-muted-foreground truncate">• {c}</span>
+                  <span className="text-muted-foreground truncate">• {displayName(c)}</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -3814,6 +3814,64 @@ function FamilyView({
             </ul>
           )}
         </div>
+
+        {pendingRequests.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-400" />
+              <div className="text-xs font-semibold">Permission requests ({pendingRequests.length})</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Your children need your OK before they can delete their account or take Trust Shield out of their
+              browser. Approve or deny each request below.
+            </p>
+            <ul className="text-xs space-y-2">
+              {pendingRequests.map((r) => {
+                const child = children.find(() => false); // resolved below via label lookup
+                void child;
+                const label = Object.entries(childLabels).find(([, lab]) => lab && r.child_id)?.[1];
+                void label;
+                return (
+                  <li
+                    key={r.id}
+                    className="p-2 rounded-md border border-border bg-card/40 flex items-center justify-between gap-2 flex-wrap"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">
+                        {r.kind === "delete_account"
+                          ? "Delete their Trust Shield account"
+                          : r.kind === "remove_extension"
+                          ? "Remove the browser extension"
+                          : r.kind}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Requested {new Date(r.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-emerald-400 hover:text-emerald-400"
+                        onClick={() => decideRequest(r.id, true)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-destructive hover:text-destructive"
+                        onClick={() => decideRequest(r.id, false)}
+                      >
+                        Deny
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/30">
           <div className="flex items-start gap-3">
