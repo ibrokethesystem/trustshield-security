@@ -71,6 +71,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "1.9.9",
+    version: "1.9.9",
+    name: "Device scanner in Network safety",
+    date: "2026-07-21",
+    summary:
+      "Network safety now includes a Device scanner that discovers this device's local network address via WebRTC, infers your Wi-Fi subnet and likely router IP, and flags what browsers can and can't see about other devices on the LAN.",
+  },
+  {
     id: "1.9.8",
     version: "1.9.8",
     name: "Guardian knows the changelog",
@@ -2087,6 +2095,8 @@ function NetworkScanView() {
         </Card>
       )}
 
+      <DeviceScanner />
+
       <Card>
         <h4 className="font-semibold text-sm mb-2">What this can't check</h4>
         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -2108,5 +2118,176 @@ function MiniInfo({ label, value, tone }: { label: string; value: React.ReactNod
       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
       <p className={cn("text-sm font-medium mt-1 truncate", toneClass)}>{value}</p>
     </div>
+  );
+}
+
+type DiscoveredDevice = {
+  ip: string;
+  label: string;
+  role: "this" | "gateway" | "peer";
+  note?: string;
+};
+
+async function getLocalIps(timeoutMs = 1500): Promise<string[]> {
+  return new Promise((resolve) => {
+    const ips = new Set<string>();
+    let pc: RTCPeerConnection | null = null;
+    try {
+      pc = new RTCPeerConnection({ iceServers: [] });
+    } catch {
+      resolve([]);
+      return;
+    }
+    const done = () => {
+      try { pc?.close(); } catch { /* ignore */ }
+      resolve(Array.from(ips));
+    };
+    const timer = setTimeout(done, timeoutMs);
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) { clearTimeout(timer); done(); return; }
+      const parts = e.candidate.candidate.split(" ");
+      const ip = parts[4];
+      if (ip && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) && !ip.startsWith("0.")) ips.add(ip);
+    };
+    pc.createDataChannel("d");
+    pc.createOffer().then((o) => pc?.setLocalDescription(o)).catch(() => { clearTimeout(timer); done(); });
+  });
+}
+
+function subnetFrom(ip: string): string | null {
+  const m = ip.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/);
+  return m ? m[1] : null;
+}
+
+function describeThisDevice(): string {
+  const ua = navigator.userAgent;
+  if (/iPhone/i.test(ua)) return "iPhone";
+  if (/iPad/i.test(ua)) return "iPad";
+  if (/Android/i.test(ua)) return "Android device";
+  if (/Mac/i.test(ua)) return "Mac";
+  if (/Windows/i.test(ua)) return "Windows PC";
+  if (/Linux/i.test(ua)) return "Linux device";
+  return "This device";
+}
+
+function DeviceScanner() {
+  const [scanning, setScanning] = useState(false);
+  const [devices, setDevices] = useState<DiscoveredDevice[] | null>(null);
+  const [subnet, setSubnet] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const scan = async () => {
+    setScanning(true);
+    setError(null);
+    setDevices(null);
+    try {
+      const ips = await getLocalIps();
+      const localIp = ips.find((i) =>
+        /^10\./.test(i) || /^192\.168\./.test(i) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(i),
+      ) || ips[0];
+
+      if (!localIp) {
+        setError(
+          "Your browser blocked local network discovery (mDNS obfuscation or private-IP protection). Everything else on this page still works.",
+        );
+        return;
+      }
+
+      const sub = subnetFrom(localIp);
+      setSubnet(sub);
+
+      const list: DiscoveredDevice[] = [
+        { ip: localIp, label: `${describeThisDevice()} (you)`, role: "this", note: navigator.userAgent.split(") ")[0].split("(")[1] || undefined },
+      ];
+
+      if (sub) {
+        list.push({
+          ip: `${sub}.1`,
+          label: "Router / gateway (likely)",
+          role: "gateway",
+          note: "Common default gateway address for this subnet.",
+        });
+        if (localIp !== `${sub}.254`) {
+          list.push({
+            ip: `${sub}.254`,
+            label: "Alternate gateway (some ISPs)",
+            role: "gateway",
+            note: "Some ISP routers use .254 instead of .1.",
+          });
+        }
+      }
+
+      setDevices(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Device scan failed");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const roleStyles: Record<DiscoveredDevice["role"], string> = {
+    this: "bg-primary/10 text-primary border-primary/30",
+    gateway: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+    peer: "bg-secondary/40 text-foreground border-border",
+  };
+
+  return (
+    <Card>
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <div>
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <MonitorSmartphone className="w-5 h-5 text-primary" /> Devices on this network
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+            Discovers this device's local address using WebRTC and infers your Wi-Fi subnet and likely router IP.
+            Browsers can't actively probe other computers on your LAN — that requires the router admin page or a native
+            scanner (Fing, Angry IP Scanner, arp -a).
+          </p>
+        </div>
+        <Button
+          onClick={scan}
+          disabled={scanning}
+          variant="outline"
+          className="gap-2 shrink-0"
+        >
+          {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+          {scanning ? "Scanning…" : "Scan devices"}
+        </Button>
+      </div>
+
+      {error && <p className="text-sm text-yellow-400 mt-2">{error}</p>}
+
+      {devices && devices.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {subnet && (
+            <p className="text-xs text-muted-foreground">
+              Detected subnet: <span className="font-mono text-foreground">{subnet}.0/24</span>
+            </p>
+          )}
+          <ul className="space-y-2">
+            {devices.map((d) => (
+              <li
+                key={d.ip}
+                className="flex items-start gap-3 bg-secondary/40 border border-border rounded-lg p-3"
+              >
+                <div className={cn("text-[10px] font-bold px-2 py-1 rounded-full border uppercase tracking-wider shrink-0", roleStyles[d.role])}>
+                  {d.role === "this" ? "You" : d.role === "gateway" ? "Router" : "Peer"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{d.label}</p>
+                  <p className="text-xs font-mono text-muted-foreground">{d.ip}</p>
+                  {d.note && <p className="text-[11px] text-muted-foreground mt-1">{d.note}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-muted-foreground pt-2">
+            To see every device connected right now, open your router admin page (try{" "}
+            <span className="font-mono">http://{subnet ? `${subnet}.1` : "192.168.1.1"}</span>) and check the "Connected
+            devices" or "DHCP clients" section.
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }
