@@ -72,6 +72,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.1.0",
+    version: "2.1.0",
+    name: "Version switcher actually reverts",
+    date: "2026-07-21",
+    summary:
+      "Selecting an older version from the version pill now truly rolls back the UI to that release — features introduced later (QR scanner, File scanner tab, Threat Radar, Inbox, Device scanner, and more) hide themselves. Your newer code is saved and one click on \"Return to current\" brings it all back.",
+  },
+  {
     id: "2.0.0",
     version: "2.0.0",
     name: "QR scanner + Trust Shield Extension 2.0",
