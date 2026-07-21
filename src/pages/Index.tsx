@@ -1235,15 +1235,14 @@ const Index = () => {
                       Only versions 2.0.0 and newer are shown. Developers can unlock all past versions.
                     </div>
                     <div className="flex gap-1.5">
-                      <input
-                        type="password"
+                      <PasswordInput
                         value={devInput}
                         onChange={(e) => setDevInput(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") tryDevUnlock();
                         }}
                         placeholder="Developer code"
-                        className="flex-1 min-w-0 px-2 py-1 rounded border border-border bg-background text-xs"
+                        className="flex-1 min-w-0 text-xs"
                       />
                       <Button size="sm" variant="outline" onClick={tryDevUnlock}>
                         Unlock
@@ -1602,9 +1601,8 @@ const Index = () => {
             </div>
             <div>
               <Label htmlFor="child-password">Choose a password</Label>
-              <Input
+              <PasswordInput
                 id="child-password"
-                type="password"
                 value={childPassword}
                 onChange={(e) => setChildPassword(e.target.value)}
                 placeholder="At least 6 characters"
@@ -1614,9 +1612,8 @@ const Index = () => {
             </div>
             <div>
               <Label htmlFor="child-password-confirm">Confirm password</Label>
-              <Input
+              <PasswordInput
                 id="child-password-confirm"
-                type="password"
                 value={childPasswordConfirm}
                 onChange={(e) => setChildPasswordConfirm(e.target.value)}
                 placeholder="Re-enter password"
@@ -1726,9 +1723,8 @@ const Index = () => {
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="child-signout-pw">Password</Label>
-            <Input
+            <PasswordInput
               id="child-signout-pw"
-              type="password"
               value={signOutPassword}
               onChange={(e) => setSignOutPassword(e.target.value)}
               onKeyDown={(e) => {
