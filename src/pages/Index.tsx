@@ -488,6 +488,13 @@ const Index = () => {
       if (email && !existing.includes(email)) existing.push(email);
       localStorage.setItem(idxKey, JSON.stringify(existing));
     }
+    // If this user was created as a child (via "Set up child account"), user_metadata carries
+    // parent_email + role=child. Recognize that on any device on first sign-in.
+    const meta = (user.user_metadata ?? {}) as { role?: string; parent_email?: string };
+    if (!localStorage.getItem(roleKey) && meta.role === "child" && meta.parent_email) {
+      localStorage.setItem(roleKey, "child");
+      localStorage.setItem(parentKey, meta.parent_email);
+    }
     const storedRole = (localStorage.getItem(roleKey) as Role | null) ?? null;
     const myEmail = (user.email ?? "").toLowerCase();
     let nextRole: Role = storedRole ?? "solo";
