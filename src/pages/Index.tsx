@@ -3160,6 +3160,7 @@ function FamilyView({
     }
   });
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
+  const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
 
   const removeChild = async (childEmail: string) => {
     // Permanently delete the child auth user (and all their data) via the
@@ -3207,6 +3208,56 @@ function FamilyView({
     });
   };
 
+  const removeAllChildren = async () => {
+    setConfirmRemoveAll(false);
+    if (children.length === 0) return;
+    const list = [...children];
+    let failed: string[] = [];
+    for (const childEmail of list) {
+      try {
+        const { data, error } = await supabase.functions.invoke("family-remove-child", {
+          body: { child_email: childEmail },
+        });
+        const errMsg = (error as { message?: string } | null)?.message
+          ?? (data as { error?: string } | null)?.error;
+        if (errMsg) {
+          failed.push(childEmail);
+          continue;
+        }
+      } catch {
+        failed.push(childEmail);
+        continue;
+      }
+      localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
+    }
+    const remaining = failed;
+    setChildren(remaining);
+    localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(remaining));
+    // Clear all local family alerts for deleted children
+    try {
+      const key = `ts_family_alerts_${parentEmail}`;
+      const raw = JSON.parse(localStorage.getItem(key) || "[]");
+      const filtered = Array.isArray(raw)
+        ? raw.filter((a: { child_email?: string }) =>
+            remaining.some((r) => r.toLowerCase() === (a.child_email ?? "").toLowerCase()))
+        : [];
+      localStorage.setItem(key, JSON.stringify(filtered));
+    } catch {
+      /* ignore */
+    }
+    onRefresh();
+    onChildrenChange?.(remaining.length);
+    if (failed.length === 0) {
+      toast.success("All child accounts deleted", {
+        description: "Every linked child account, their browsing history, and banned sites are gone.",
+      });
+    } else {
+      toast.error(`Couldn't delete ${failed.length} child account(s)`, {
+        description: failed.join(", "),
+      });
+    }
+  };
+
   const downloadChildExtension = () => {
     fetch("/trust-shield-child-extension.zip")
       .then((res) => {
@@ -3246,6 +3297,17 @@ function FamilyView({
           <Button variant="outline" size="sm" onClick={onRefresh}>
             Refresh
           </Button>
+          {children.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setConfirmRemoveAll(true)}
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Delete all
+            </Button>
+          )}
         </div>
 
         <div className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border">
@@ -3325,6 +3387,28 @@ function FamilyView({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmRemoveAll} onOpenChange={setConfirmRemoveAll}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete all child accounts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This <span className="font-semibold">permanently deletes every linked child</span> ({children.length}) —
+              their Trust Shield accounts, browsing history, banned sites, and family alerts. None of them will be
+              able to sign in again. The Family tab will disappear once you leave it. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={removeAllChildren}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete all forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
