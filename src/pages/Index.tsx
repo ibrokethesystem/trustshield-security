@@ -1656,7 +1656,11 @@ function ThreatRow({
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("guardian-chat", {
-        body: { threat_id: threat.id, messages: next },
+        body: {
+          threat_id: threat.id,
+          messages: next,
+          audience: (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
+        },
       });
       if (error) throw error;
       const reply = (data as any)?.reply as string | undefined;
