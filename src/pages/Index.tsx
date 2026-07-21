@@ -2790,3 +2790,114 @@ function QrScannerView() {
     </Card>
   );
 }
+
+function FamilyView({
+  alerts,
+  parentEmail,
+  onRefresh,
+  onClear,
+}: {
+  alerts: {
+    id: string;
+    child_email: string;
+    title: string;
+    severity: string;
+    created_at: string;
+    summary?: string;
+  }[];
+  parentEmail: string;
+  onRefresh: () => void;
+  onClear: () => void;
+}) {
+  const children: string[] = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(`ts_family_children_${parentEmail}`) || "[]");
+    } catch {
+      return [];
+    }
+  })();
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Users className="w-5 h-5 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-bold">Family monitor</h2>
+            <p className="text-sm text-muted-foreground">
+              Alerts from linked child accounts appear here. Children get simplified alerts and are told to talk to
+              you when something suspicious shows up.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onRefresh}>
+            Refresh
+          </Button>
+        </div>
+
+        <div className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border">
+          <div className="text-xs font-semibold mb-1">Linked children ({children.length})</div>
+          {children.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No linked child accounts yet. To add one: sign out, go to the login page, click "Have a child?" and
+              sign the child in with their own Google account using your email as parent.
+            </p>
+          ) : (
+            <ul className="text-xs space-y-1">
+              {children.map((c) => (
+                <li key={c} className="text-muted-foreground">
+                  • {c}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-xs font-semibold text-muted-foreground">
+            Recent child alerts ({alerts.length})
+          </div>
+          {alerts.length > 0 && (
+            <Button variant="outline" size="sm" onClick={onClear}>
+              <Trash2 className="w-3.5 h-3.5 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
+        {alerts.length === 0 ? (
+          <p className="text-xs text-muted-foreground mt-2">
+            No alerts from your children yet. When a child account scans something risky, it'll show up here.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {alerts.map((a) => (
+              <li
+                key={a.id}
+                className="p-3 rounded-lg border border-border bg-card/50 flex items-start gap-3"
+              >
+                <div className="w-8 h-8 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4 text-destructive" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold truncate">{a.title}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-wider bg-secondary text-muted-foreground">
+                      {a.severity}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {a.child_email} · {new Date(a.created_at).toLocaleString()}
+                  </p>
+                  {a.summary && (
+                    <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{a.summary}</p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
