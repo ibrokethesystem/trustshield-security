@@ -304,10 +304,7 @@ const Index = () => {
   const [appInstalled, setAppInstalled] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [versionMenuOpen, setVersionMenuOpen] = useState(false);
-  const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("ts_dev_unlocked") === "1";
-  });
+  const [devUnlocked, setDevUnlocked] = useState<boolean>(false);
   const [devInput, setDevInput] = useState("");
   const [selectedVersion, setSelectedVersion] = useState<string>(() => {
     if (typeof window === "undefined") return UPDATES[0]?.version ?? "2.0.0";
@@ -353,22 +350,36 @@ const Index = () => {
       });
     }
   };
+  const devKey = user ? `ts_dev_unlocked_${user.id}` : null;
   const tryDevUnlock = () => {
+    if (!devKey) {
+      toast.error("Sign in to unlock developer mode");
+      return;
+    }
     if (devInput === "TrustShieldDevs1357908642)*^$@!#%&(") {
-      localStorage.setItem("ts_dev_unlocked", "1");
+      localStorage.setItem(devKey, "1");
       setDevUnlocked(true);
       setDevInput("");
-      toast.success("Developer mode unlocked — all past versions visible.");
+      toast.success("Developer mode unlocked for this account.");
     } else {
       toast.error("Incorrect developer code");
     }
   };
   useEffect(() => {
-    if (devUnlocked && !devFeatureAvailable) {
-      localStorage.removeItem("ts_dev_unlocked");
+    // Dev mode is per-account. Legacy global flag is cleared to prevent leaking across accounts.
+    if (typeof window !== "undefined") localStorage.removeItem("ts_dev_unlocked");
+    if (!devKey) {
+      setDevUnlocked(false);
+      return;
+    }
+    setDevUnlocked(localStorage.getItem(devKey) === "1");
+  }, [devKey]);
+  useEffect(() => {
+    if (devUnlocked && !devFeatureAvailable && devKey) {
+      localStorage.removeItem(devKey);
       setDevUnlocked(false);
     }
-  }, [devUnlocked, devFeatureAvailable]);
+  }, [devUnlocked, devFeatureAvailable, devKey]);
   const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("ts_last_read_update") ?? null;
@@ -789,6 +800,34 @@ const Index = () => {
     navigate("/auth", { replace: true });
   };
 
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [signOutPassword, setSignOutPassword] = useState("");
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const requestSignOut = () => {
+    if (role === "child") {
+      setSignOutPassword("");
+      setSignOutOpen(true);
+    } else {
+      void signOut();
+    }
+  };
+  const confirmChildSignOut = async () => {
+    if (!user?.email || !signOutPassword) return;
+    setSignOutBusy(true);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: signOutPassword,
+    });
+    setSignOutBusy(false);
+    if (error) {
+      toast.error("Wrong password", { description: "Ask your parent for help." });
+      return;
+    }
+    setSignOutOpen(false);
+    setSignOutPassword("");
+    await signOut();
+  };
+
   const startChildSignup = async () => {
     if (!user?.email) {
       toast.error("Sign in first");
@@ -1017,7 +1056,7 @@ const Index = () => {
               {displayName || user.email}
             </button>
             <button
-              onClick={signOut}
+              onClick={requestSignOut}
               className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
             >
               <LogOut className="w-3 h-3" /> Sign out
@@ -1096,6 +1135,7 @@ const Index = () => {
               <Share2 className="w-4 h-4" />
               Share
             </Button>
+            {role !== "child" && showVersionPill && (
             <Popover open={versionMenuOpen} onOpenChange={setVersionMenuOpen}>
               <PopoverTrigger asChild>
                 <button
@@ -1188,6 +1228,7 @@ const Index = () => {
                 )}
               </PopoverContent>
             </Popover>
+            )}
             <div
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
@@ -1625,6 +1666,39 @@ const Index = () => {
       </Dialog>
 
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+
+      <Dialog open={signOutOpen} onOpenChange={(o) => !signOutBusy && setSignOutOpen(o)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm sign out</DialogTitle>
+            <DialogDescription>
+              Enter your password to sign out of your child account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="child-signout-pw">Password</Label>
+            <Input
+              id="child-signout-pw"
+              type="password"
+              value={signOutPassword}
+              onChange={(e) => setSignOutPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void confirmChildSignOut();
+              }}
+              placeholder="Your password"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignOutOpen(false)} disabled={signOutBusy}>
+              Cancel
+            </Button>
+            <Button onClick={confirmChildSignOut} disabled={signOutBusy || !signOutPassword}>
+              {signOutBusy ? "Checking…" : "Sign out"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
