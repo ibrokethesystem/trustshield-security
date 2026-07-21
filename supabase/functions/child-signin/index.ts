@@ -27,13 +27,22 @@ Deno.serve(async (req) => {
 
     const { data: links } = await admin
       .from('child_links')
-      .select('child_email')
+      .select('child_id, child_email')
       .eq('parent_id', parentId)
       .is('deleted_at', null);
 
-    const candidates = Array.from(
-      new Set((links ?? []).map((l: { child_email: string }) => (l.child_email ?? '').toLowerCase()).filter(Boolean))
-    );
+    const emails = new Set<string>();
+    for (const l of (links ?? []) as { child_id: string; child_email: string | null }[]) {
+      if (l.child_email) emails.add(l.child_email.toLowerCase());
+      // Fallback: fetch the auth user's email if the link row didn't store it
+      // (older child_links rows created before child_email was populated).
+      if (l.child_id) {
+        const { data: cu } = await admin.auth.admin.getUserById(l.child_id);
+        const em = (cu?.user?.email ?? '').toLowerCase();
+        if (em) emails.add(em);
+      }
+    }
+    const candidates = Array.from(emails);
     if (candidates.length === 0) return json({ error: 'invalid_credentials' }, 401);
 
     // Try each candidate. Use a fresh anon client so sign-in doesn't pollute state.
