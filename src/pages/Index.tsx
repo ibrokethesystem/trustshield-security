@@ -3218,6 +3218,29 @@ function FamilyView({
           )}
         </div>
 
+        <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/30">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <Puzzle className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-sm">Child browser extension</h4>
+              <p className="text-xs text-muted-foreground mt-1">
+                Install this on your child's Chrome or Edge browser. It uses kid-friendly wording ("ask a grown-up")
+                and warns them before dangerous or fake-login pages load.
+              </p>
+              <Button size="sm" className="mt-3" onClick={downloadChildExtension}>
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                Download child extension
+              </Button>
+              <p className="text-[11px] text-muted-foreground mt-2">
+                Unzip on the child's computer → open <code>chrome://extensions</code> or{" "}
+                <code>edge://extensions</code> → enable Developer mode → "Load unpacked".
+              </p>
+            </div>
+          </div>
+        </div>
+
       <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
