@@ -3982,6 +3982,10 @@ function FamilyView({
             </p>
             <ul className="text-xs space-y-2">
               {pendingRequests.map((r) => {
+                const info = childInfoById[r.child_id];
+                const who = info
+                  ? `${(info.label ?? "").replace(/-/g, " ") || "Child"} (${info.email})`
+                  : "A linked child";
                 return (
                   <li
                     key={r.id}
@@ -3993,10 +3997,16 @@ function FamilyView({
                           ? "Delete their Trust Shield account"
                           : r.kind === "remove_extension"
                           ? "Remove the browser extension"
+                          : r.kind === "unblock_site"
+                          ? (
+                              <span>
+                                Unblock <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                              </span>
+                            )
                           : r.kind}
                       </div>
                       <div className="text-[10px] text-muted-foreground">
-                        Requested {new Date(r.created_at).toLocaleString()}
+                        From {who} · {new Date(r.created_at).toLocaleString()}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -4004,7 +4014,13 @@ function FamilyView({
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-emerald-400 hover:text-emerald-400"
-                        onClick={() => decideRequest(r.id, true)}
+                        onClick={() =>
+                          decideRequest(r.id, true, {
+                            kind: r.kind,
+                            child_id: r.child_id,
+                            note: r.note,
+                          })
+                        }
                       >
                         Approve
                       </Button>
