@@ -284,6 +284,9 @@ const Index = () => {
   >([]);
   const [childDialogOpen, setChildDialogOpen] = useState(false);
   const [childBusy, setChildBusy] = useState(false);
+  const [childEmail, setChildEmail] = useState("");
+  const [childPassword, setChildPassword] = useState("");
+  const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
