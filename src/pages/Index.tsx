@@ -3501,14 +3501,59 @@ function FamilyView({
           </div>
         </div>
 
+        {deletedChildren.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-destructive/5 border border-destructive/30">
+            <div className="flex items-center gap-2 mb-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              <div className="text-xs font-semibold">Deleted children ({deletedChildren.length})</div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-2">
+              Recycle bin. Restore a child to let them sign in again, or purge them to erase their account and
+              browsing history forever.
+            </p>
+            <ul className="text-xs space-y-1">
+              {deletedChildren.map((c) => (
+                <li key={c.child_id} className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-muted-foreground truncate">• {c.child_email}</div>
+                    <div className="text-[10px] text-muted-foreground/70">
+                      Deleted {new Date(c.deleted_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-primary hover:text-primary"
+                      onClick={() => restoreChild(c.child_email)}
+                    >
+                      <Undo2 className="w-3 h-3 mr-1" />
+                      Restore
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-destructive hover:text-destructive"
+                      onClick={() => setConfirmPurge(c.child_email)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Purge
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
       <AlertDialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete child account?</AlertDialogTitle>
             <AlertDialogDescription>
-              This <span className="font-semibold">permanently deletes</span>{" "}
-              <span className="font-semibold">{confirmRemove}</span> — the child account, all of their browsing
-              history, banned sites, and family alerts. They will no longer be able to sign in. This cannot be undone.
+              This moves <span className="font-semibold">{confirmRemove}</span> to the "Deleted children" recycle
+              bin. They won't be able to sign in, but you can restore them later from the Family tab. To erase them
+              forever, use "Purge" in the Deleted children section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3517,7 +3562,7 @@ function FamilyView({
               onClick={() => confirmRemove && removeChild(confirmRemove)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete forever
+              Move to Deleted
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -3528,9 +3573,9 @@ function FamilyView({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete all child accounts?</AlertDialogTitle>
             <AlertDialogDescription>
-              This <span className="font-semibold">permanently deletes every linked child</span> ({children.length}) —
-              their Trust Shield accounts, browsing history, banned sites, and family alerts. None of them will be
-              able to sign in again. The Family tab will disappear once you leave it. This cannot be undone.
+              This moves <span className="font-semibold">every linked child</span> ({children.length}) to the
+              "Deleted children" recycle bin. They won't be able to sign in, but you can restore any of them from
+              the Family tab. To erase forever, purge them from the Deleted section.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -3539,7 +3584,29 @@ function FamilyView({
               onClick={removeAllChildren}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete all forever
+              Move all to Deleted
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmPurge} onOpenChange={(o) => !o && setConfirmPurge(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Purge this child forever?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This <span className="font-semibold">permanently erases</span>{" "}
+              <span className="font-semibold">{confirmPurge}</span> — the child account, browsing history, and
+              banned sites. This <span className="font-semibold">cannot be undone</span> and cannot be restored.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmPurge && purgeChild(confirmPurge)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Purge forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
