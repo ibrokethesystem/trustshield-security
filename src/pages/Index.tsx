@@ -70,6 +70,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "1.9.6",
+    version: "1.9.6",
+    name: "Version indicator",
+    date: "2026-07-21",
+    summary:
+      "Added a version badge next to the Share button so you always know which build of Trust Shield you're running.",
+  },
+  {
     id: "1.9.5",
     version: "1.9.5",
     name: "Inbox & release notes",
