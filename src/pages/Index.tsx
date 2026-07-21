@@ -3955,6 +3955,19 @@ function FamilyView({
               {children.map((c) => (
                 <li key={c} className="flex items-center justify-between gap-2 group">
                   <span className="text-muted-foreground truncate">• {displayName(c)}</span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2"
+                      onClick={() => {
+                        setRenameOpen(c);
+                        setRenameValue((childLabels[c.toLowerCase()] ?? "").replace(/-/g, " "));
+                      }}
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      Rename
+                    </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -3964,6 +3977,7 @@ function FamilyView({
                     <Trash2 className="w-3 h-3 mr-1" />
                     Remove
                   </Button>
+                  </div>
                 </li>
               ))}
             </ul>
