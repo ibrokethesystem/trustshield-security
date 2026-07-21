@@ -3532,6 +3532,55 @@ function FamilyView({
   const [confirmRemoveAll, setConfirmRemoveAll] = useState(false);
   const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
   const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
+  const [childLabels, setChildLabels] = useState<Record<string, string>>({});
+  const [pendingRequests, setPendingRequests] = useState<
+    { id: string; kind: string; status: string; created_at: string; child_id: string }[]
+  >([]);
+
+  const loadLabels = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("child_links")
+      .select("child_email, label")
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    const map: Record<string, string> = {};
+    (data ?? []).forEach((r) => {
+      if (r.child_email && r.label) map[r.child_email.toLowerCase()] = r.label;
+    });
+    setChildLabels(map);
+  }, [parentUserId]);
+
+  const loadRequests = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data } = await supabase
+      .from("permission_requests")
+      .select("id, kind, status, created_at, child_id")
+      .eq("parent_id", parentUserId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setPendingRequests((data ?? []) as typeof pendingRequests);
+  }, [parentUserId]);
+
+  useEffect(() => { void loadLabels(); void loadRequests(); }, [loadLabels, loadRequests]);
+
+  const decideRequest = async (id: string, approve: boolean) => {
+    const { error } = await supabase
+      .from("permission_requests")
+      .update({ status: approve ? "approved" : "denied", resolved_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) {
+      toast.error("Couldn't update request", { description: error.message });
+      return;
+    }
+    toast.success(approve ? "Request approved" : "Request denied");
+    await loadRequests();
+  };
+
+  const displayName = (email: string) => {
+    const label = childLabels[email.toLowerCase()];
+    return label ? `${label.replace(/-/g, " ")} · ${email}` : email;
+  };
 
   const loadDeleted = useCallback(async () => {
     if (!parentUserId) return;
