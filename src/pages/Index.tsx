@@ -1297,6 +1297,18 @@ const Index = () => {
               setView("guardian");
             }}
           />
+        ) : view === "family" ? (
+          <FamilyView
+            alerts={familyAlerts}
+            parentEmail={(user?.email ?? "").toLowerCase()}
+            onRefresh={loadFamilyAlerts}
+            onClear={() => {
+              if (!user) return;
+              localStorage.setItem(`ts_family_alerts_${(user.email ?? "").toLowerCase()}`, "[]");
+              setFamilyAlerts([]);
+              toast.success("Family inbox cleared");
+            }}
+          />
         ) : (
           <GuardianView
             threats={threats ?? []}
