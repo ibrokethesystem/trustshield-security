@@ -266,22 +266,31 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
         }
       } catch {}
 
-      const [{ data: rows }, { data: setting }] = await Promise.all([
-        supabase.from("vault_entries").select("*").eq("user_id", userId).order("updated_at", { ascending: false }),
-        supabase.from("vault_settings").select("*").eq("user_id", userId).maybeSingle(),
-      ]);
+      const { data: setting } = await supabase
+        .from("vault_settings").select("*").eq("user_id", userId).maybeSingle();
       if (cancelled) return;
-      const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
-        id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
-      }));
-      setEntries(list);
-      updateSummary(list);
 
       const enabled = !!setting?.lock_enabled;
       setLockEnabled(enabled);
       setPinHash(setting?.pin_hash ?? null);
       setPinSalt(setting?.pin_salt ?? null);
       setUnlocked(!enabled); // if lock off, treat as unlocked
+
+      // Only fetch entries when the lock is off. When the lock is on we wait
+      // for the user to enter the PIN and fetch through the server route so
+      // passwords are never loaded into memory before verification.
+      if (!enabled) {
+        const { data: rows } = await supabase
+          .from("vault_entries").select("*").eq("user_id", userId).order("updated_at", { ascending: false });
+        if (cancelled) return;
+        const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
+          id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
+        }));
+        setEntries(list);
+        updateSummary(list);
+      } else {
+        setEntries([]);
+      }
 
       // Fingerprint registered on this device?
       try {
@@ -466,8 +475,25 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
   const tryUnlockPin = async () => {
     if (!pinHash || !pinSalt) return;
     const hash = await sha256Hex(pinSalt + ":" + unlockPin);
-    if (hash === pinHash) { setUnlocked(true); setUnlockPin(""); toast.success("Vault unlocked"); }
-    else toast.error("Wrong code");
+    if (hash !== pinHash) { toast.error("Wrong code"); return; }
+    // Fetch entries from the server, which re-verifies the PIN before returning
+    // any password data.
+    try {
+      const { data, error } = await supabase.functions.invoke("vault-fetch", {
+        body: { pin: unlockPin },
+      });
+      if (error || !data?.entries) { toast.error("Couldn't unlock vault"); return; }
+      const list: VaultEntry[] = (data.entries as any[]).map((r) => ({
+        id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
+      }));
+      setEntries(list);
+      updateSummary(list);
+      setUnlocked(true);
+      setUnlockPin("");
+      toast.success("Vault unlocked");
+    } catch {
+      toast.error("Couldn't unlock vault");
+    }
   };
 
   const tryUnlockFingerprint = async () => {
@@ -475,8 +501,13 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
     const credId = localStorage.getItem(WEBAUTHN_LOCAL_KEY(userId));
     if (!credId) { toast.error("No fingerprint enrolled on this device"); return; }
     const ok = await verifyFingerprintCredential(credId);
-    if (ok) { setUnlocked(true); toast.success("Vault unlocked"); }
-    else toast.error("Fingerprint check failed");
+    if (!ok) { toast.error("Fingerprint check failed"); return; }
+    if (entries.length === 0) {
+      toast.message("Enter your vault password once to load your saved logins on this device.");
+      return;
+    }
+    setUnlocked(true);
+    toast.success("Vault unlocked");
   };
 
   const enrollFingerprintNow = async () => {
