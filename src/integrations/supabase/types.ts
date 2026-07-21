@@ -369,6 +369,7 @@ export type Database = {
           child_email: string
         }[]
       }
+      my_parent_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       threat_severity: "low" | "medium" | "high" | "critical"
