@@ -282,6 +282,8 @@ const Index = () => {
   const [familyAlerts, setFamilyAlerts] = useState<
     { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
   >([]);
+  const [childDialogOpen, setChildDialogOpen] = useState(false);
+  const [childBusy, setChildBusy] = useState(false);
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -765,6 +767,28 @@ const Index = () => {
   const signOut = async () => {
     await supabase.auth.signOut();
     navigate("/auth", { replace: true });
+  };
+
+  const startChildSignup = async () => {
+    if (!user?.email) {
+      toast.error("Sign in first");
+      return;
+    }
+    setChildBusy(true);
+    localStorage.setItem("ts_pending_child_signup", user.email.toLowerCase());
+    // Sign the parent out so Google shows the account chooser for the child.
+    await supabase.auth.signOut();
+    const result = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+      extraParams: { prompt: "select_account" },
+    });
+    if (result.error) {
+      localStorage.removeItem("ts_pending_child_signup");
+      toast.error("Google sign-in failed", { description: result.error.message });
+      setChildBusy(false);
+      return;
+    }
+    // Redirect handles the rest.
   };
 
   if (authLoading || !user) {
