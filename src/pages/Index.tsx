@@ -71,6 +71,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "1.9.7",
+    version: "1.9.7",
+    name: "New shield logo",
+    date: "2026-07-21",
+    summary:
+      "Refreshed the Trust Shield brand — the sidebar and Chrome, Edge, and Safari extensions now use the new metallic shield-and-padlock icon.",
+  },
+  {
     id: "1.9.6",
     version: "1.9.6",
     name: "Version indicator",
