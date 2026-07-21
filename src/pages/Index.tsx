@@ -786,6 +786,7 @@ const Index = () => {
               <LogOut className="w-3 h-3" /> Sign out
             </button>
           </div>
+          {showInbox && (
           <Popover
             open={inboxOpen}
             onOpenChange={(o) => {
