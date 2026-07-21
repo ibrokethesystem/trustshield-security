@@ -476,17 +476,28 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
   };
 
   const tryUnlockPin = async () => {
-    if (!pinHash || !pinSalt) return;
-    const hash = await sha256Hex(pinSalt + ":" + unlockPin);
-    if (hash !== pinHash) { toast.error("Wrong code"); return; }
-    // Fetch entries from the server, which re-verifies the PIN before returning
-    // any password data.
+    if (!unlockPin) { toast.error("Enter your vault password"); return; }
+    // The server re-hashes and verifies the PIN, then returns entries. We
+    // rely on the server response (not a local hash check) so the unlock
+    // works even if the client couldn't read pin_hash for any reason.
     try {
       const { data, error } = await supabase.functions.invoke("vault-fetch", {
         body: { pin: unlockPin },
       });
-      if (error || !data?.entries) { toast.error("Couldn't unlock vault"); return; }
-      const list: VaultEntry[] = (data.entries as any[]).map((r) => ({
+      if (error) {
+        const msg = (error as { message?: string })?.message || "";
+        if (/invalid_pin|401/i.test(msg)) toast.error("Wrong code");
+        else toast.error("Couldn't unlock vault", { description: msg });
+        return;
+      }
+      if (!data || (data as { error?: string }).error) {
+        const err = (data as { error?: string })?.error;
+        if (err === "invalid_pin" || err === "pin_required") toast.error("Wrong code");
+        else toast.error("Couldn't unlock vault", { description: err });
+        return;
+      }
+      const rows = ((data as { entries?: unknown[] }).entries ?? []) as any[];
+      const list: VaultEntry[] = rows.map((r) => ({
         id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
       }));
       setEntries(list);
@@ -494,8 +505,8 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       setUnlocked(true);
       setUnlockPin("");
       toast.success("Vault unlocked");
-    } catch {
-      toast.error("Couldn't unlock vault");
+    } catch (e) {
+      toast.error("Couldn't unlock vault", { description: e instanceof Error ? e.message : "" });
     }
   };
 
