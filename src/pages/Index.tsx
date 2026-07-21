@@ -1908,9 +1908,10 @@ function MyParentView({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [siblings, setSiblings] = useState<{ child_id: string; child_email: string; label: string | null }[]>([]);
   const [requests, setRequests] = useState<
-    { id: string; kind: string; status: string; created_at: string; resolved_at: string | null }[]
+    { id: string; kind: string; status: string; created_at: string; resolved_at: string | null; note: string | null }[]
   >([]);
   const [reqBusy, setReqBusy] = useState(false);
+  const [unblockUrl, setUnblockUrl] = useState("");
 
   const loadSiblings = useCallback(async () => {
     if (!childUserId) return;
@@ -1922,7 +1923,7 @@ function MyParentView({
     if (!childUserId) return;
     const { data } = await supabase
       .from("permission_requests")
-      .select("id, kind, status, created_at, resolved_at")
+      .select("id, kind, status, created_at, resolved_at, note")
       .eq("child_id", childUserId)
       .order("created_at", { ascending: false });
     setRequests((data ?? []) as typeof requests);
@@ -1935,7 +1936,10 @@ function MyParentView({
   const approvedDeleteReq = requests.find((r) => r.kind === "delete_account" && r.status === "approved");
   const removalReq = activeRequestOfKind("remove_extension");
 
-  const requestPermission = async (kind: "delete_account" | "remove_extension") => {
+  const requestPermission = async (
+    kind: "delete_account" | "remove_extension" | "unblock_site",
+    note?: string,
+  ) => {
     if (!childUserId) return;
     setReqBusy(true);
     try {
@@ -1949,17 +1953,21 @@ function MyParentView({
         toast.error("Couldn't find your parent account");
         return;
       }
-      // Cancel any prior pending request of the same kind so we don't spam.
-      await supabase
-        .from("permission_requests")
-        .delete()
-        .eq("child_id", childUserId)
-        .eq("kind", kind)
-        .eq("status", "pending");
+      // For account/extension actions, cancel prior pending of same kind so we
+      // don't spam. Unblock requests can stack (different URLs).
+      if (kind !== "unblock_site") {
+        await supabase
+          .from("permission_requests")
+          .delete()
+          .eq("child_id", childUserId)
+          .eq("kind", kind)
+          .eq("status", "pending");
+      }
       const { error } = await supabase.from("permission_requests").insert({
         parent_id: link.parent_id,
         child_id: childUserId,
         kind,
+        note: note ?? null,
       });
       if (error) {
         toast.error("Couldn't send request", { description: error.message });
@@ -1972,6 +1980,28 @@ function MyParentView({
     } finally {
       setReqBusy(false);
     }
+  };
+
+  const normalizeHost = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+      const withScheme = trimmed.match(/^https?:\/\//i) ? trimmed : `https://${trimmed}`;
+      const u = new URL(withScheme);
+      return u.hostname.toLowerCase().replace(/^www\./, "");
+    } catch {
+      return null;
+    }
+  };
+
+  const submitUnblock = async () => {
+    const host = normalizeHost(unblockUrl);
+    if (!host) {
+      toast.error("Please enter a valid website like example.com");
+      return;
+    }
+    await requestPermission("unblock_site", host);
+    setUnblockUrl("");
   };
 
   const deleteSelf = async () => {
@@ -1999,7 +2029,13 @@ function MyParentView({
   };
 
   const kindLabel = (k: string) =>
-    k === "delete_account" ? "Delete my account" : k === "remove_extension" ? "Remove browser extension" : k;
+    k === "delete_account"
+      ? "Delete my account"
+      : k === "remove_extension"
+      ? "Remove browser extension"
+      : k === "unblock_site"
+      ? "Unblock a website"
+      : k;
   const statusBadge = (s: string) =>
     s === "approved"
       ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
