@@ -174,13 +174,14 @@ type ScanRecord = {
   created_at: string;
 };
 
-type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files";
+type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr";
 const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
   { key: "files", label: "File scanner", icon: FileScan },
   { key: "network", label: "Network safety", icon: Wifi },
+  { key: "qr", label: "QR scanner", icon: QrCode },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
