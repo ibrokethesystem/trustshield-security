@@ -72,6 +72,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.1.0",
+    version: "2.1.0",
+    name: "Version switcher actually reverts",
+    date: "2026-07-21",
+    summary:
+      "Selecting an older version from the version pill now truly rolls back the UI to that release — features introduced later (QR scanner, File scanner tab, Threat Radar, Inbox, Device scanner, and more) hide themselves. Your newer code is saved and one click on \"Return to current\" brings it all back.",
+  },
+  {
     id: "2.0.0",
     version: "2.0.0",
     name: "QR scanner + Trust Shield Extension 2.0",
@@ -175,16 +183,32 @@ type ScanRecord = {
 };
 
 type ViewKey = "dashboard" | "history" | "guardian" | "network" | "extensions" | "passwords" | "files" | "qr";
-const navItems: { key: ViewKey; label: string; icon: React.ElementType }[] = [
+const navItems: { key: ViewKey; label: string; icon: React.ElementType; minVersion?: string }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
   { key: "passwords", label: "Passwords", icon: KeyRound },
-  { key: "files", label: "File scanner", icon: FileScan },
+  { key: "files", label: "File scanner", icon: FileScan, minVersion: "1.9.2" },
   { key: "network", label: "Network safety", icon: Wifi },
-  { key: "qr", label: "QR scanner", icon: QrCode },
+  { key: "qr", label: "QR scanner", icon: QrCode, minVersion: "2.0.0" },
   { key: "history", label: "Scan history", icon: History },
   { key: "extensions", label: "Extensions", icon: Puzzle },
 ];
+
+// Compare semver strings ("1.9.9" vs "2.0.0"). Module-level so NetworkScanView etc. can use it.
+const compareVersion = (a: string, b: string) => {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  }
+  return 0;
+};
+const getActiveVersion = () => {
+  if (typeof window === "undefined") return UPDATES[0]?.version ?? "2.0.0";
+  return localStorage.getItem("ts_active_version") || (UPDATES[0]?.version ?? "2.0.0");
+};
+const hasFeatureAt = (minVer: string, activeVer?: string) =>
+  compareVersion(activeVer ?? getActiveVersion(), minVer) >= 0;
 
 const severityStyles: Record<Threat["severity"], string> = {
   low: "bg-blue-500/10 text-blue-400 border-blue-500/30",
@@ -268,14 +292,13 @@ const Index = () => {
     return localStorage.getItem("ts_active_version") || (UPDATES[0]?.version ?? "2.0.0");
   });
   const latestVersion = UPDATES[0]?.version ?? "2.0.0";
-  const cmpVersion = (a: string, b: string) => {
-    const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
-    const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
-    for (let i = 0; i < 3; i++) {
-      if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
-    }
-    return 0;
-  };
+  const cmpVersion = compareVersion;
+  const hasFeature = (minVer: string) => cmpVersion(selectedVersion, minVer) >= 0;
+  // Features gated by the active version marker. Reverting to an older version hides them.
+  const showInbox = hasFeature("1.9.5");
+  const showThreatRadar = hasFeature("1.9.3");
+  const showVersionPill = hasFeature("1.9.6");
+  const visibleNavItems = navItems.filter((n) => !n.minVersion || hasFeature(n.minVersion));
   // Dev feature auto-removes at v2.5.0 per spec.
   const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
   const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
@@ -286,11 +309,20 @@ const Index = () => {
     setSelectedVersion(v);
     localStorage.setItem("ts_active_version", v);
     setVersionMenuOpen(false);
+    // If the current view was introduced after this version, fall back to Dashboard.
+    const current = navItems.find((n) => n.key === view);
+    if (current?.minVersion && compareVersion(v, current.minVersion) < 0) {
+      setView("dashboard");
+    }
+    // Force NetworkScanView / other version-aware children to re-read localStorage.
+    window.dispatchEvent(new CustomEvent("ts:version-change", { detail: v }));
     if (v === latestVersion) {
-      toast.success(`On the latest version (v${v})`);
+      toast.success(`On the latest version (v${v})`, {
+        description: "All the newest Trust Shield features are active.",
+      });
     } else {
       toast(`Reverted to v${v}`, {
-        description: "This is a UI-level version marker — code stays on the latest build.",
+        description: "Features added after this version are hidden. Your newer code is saved — return anytime.",
       });
     }
   };
@@ -686,7 +718,7 @@ const Index = () => {
         </div>
 
         <nav className="flex flex-col gap-1">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.label}
               onClick={() => setView(item.key)}
@@ -762,6 +794,7 @@ const Index = () => {
               <LogOut className="w-3 h-3" /> Sign out
             </button>
           </div>
+          {showInbox && (
           <Popover
             open={inboxOpen}
             onOpenChange={(o) => {
@@ -808,6 +841,7 @@ const Index = () => {
               </div>
             </PopoverContent>
           </Popover>
+          )}
         </div>
       </aside>
 
@@ -1101,7 +1135,7 @@ const Index = () => {
                 </Button>
               </div>
             </Card>
-            <ThreatRadarView userId={user?.id} />
+            {showThreatRadar && <ThreatRadarView userId={user?.id} />}
             </div>
 
             {/* Threats list */}
@@ -2072,6 +2106,12 @@ function NetworkScanView() {
     downlink?: number;
     rtt?: number;
   } | null>(null);
+  const [showDevices, setShowDevices] = useState<boolean>(() => hasFeatureAt("1.9.9"));
+  useEffect(() => {
+    const update = () => setShowDevices(hasFeatureAt("1.9.9"));
+    window.addEventListener("ts:version-change", update);
+    return () => window.removeEventListener("ts:version-change", update);
+  }, []);
 
   useEffect(() => {
     setHttps(window.location.protocol === "https:");
@@ -2246,7 +2286,7 @@ function NetworkScanView() {
         </Card>
       )}
 
-      <DeviceScanner />
+      {showDevices && <DeviceScanner />}
 
       <Card>
         <h4 className="font-semibold text-sm mb-2">What this can't check</h4>
