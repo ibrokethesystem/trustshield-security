@@ -3137,6 +3137,7 @@ function FamilyView({
   parentUserId?: string;
   onRefresh: () => void;
   onClear: () => void;
+  onAskGuardian?: () => void;
 }) {
   const [children, setChildren] = useState<string[]>(() => {
     try {
