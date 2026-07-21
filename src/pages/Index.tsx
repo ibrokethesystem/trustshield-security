@@ -3700,26 +3700,32 @@ function FamilyView({
   const submitRename = async () => {
     const email = renameOpen;
     if (!email || !parentUserId) return;
-    const label = childLabelSlug(renameValue);
-    if (!label) {
+    const displayLabel = renameValue.trim().slice(0, 60);
+    const slug = childLabelSlug(displayLabel);
+    if (!displayLabel) {
+      toast.error("Name can't be empty");
+      return;
+    }
+    if (!slug) {
       toast.error("Name needs at least one letter or number");
       return;
     }
-    // Prevent duplicate labels for this parent
+    // Prevent duplicate labels for this parent (compare slugs so "Alex!" and
+    // "alex" are treated as the same name for login-derivation purposes).
     const { data: existing } = await supabase
       .from("child_links")
       .select("label, child_email")
       .eq("parent_id", parentUserId)
       .is("deleted_at", null);
     if ((existing ?? []).some(
-      (r) => (r.label ?? "").toLowerCase() === label && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
+      (r) => childLabelSlug(r.label ?? "") === slug && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
     )) {
       toast.error("You already have another child with that name");
       return;
     }
     const { error } = await supabase
       .from("child_links")
-      .update({ label })
+      .update({ label: displayLabel })
       .eq("parent_id", parentUserId)
       .ilike("child_email", email);
     if (error) {
