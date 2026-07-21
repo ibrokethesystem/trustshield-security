@@ -37,6 +37,7 @@ import {
   Copy,
   MessageSquare,
   KeyRound,
+  QrCode,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import { Button } from "@/components/ui/button";
