@@ -805,11 +805,6 @@ const Index = () => {
       toast.error("Sign in first");
       return;
     }
-    const email = childEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) {
-      toast.error("Enter a valid email for the child account");
-      return;
-    }
     if (childPassword.length < 6) {
       toast.error("Password must be at least 6 characters");
       return;
@@ -823,6 +818,7 @@ const Index = () => {
     const { data: parentSessionData } = await supabase.auth.getSession();
     const parentSession = parentSessionData.session;
     const parentEmailLower = user.email.toLowerCase();
+    const email = await childEmailFor(parentEmailLower);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -832,7 +828,37 @@ const Index = () => {
           data: { role: "child", parent_email: parentEmailLower },
         },
       });
-      if (error) throw error;
+      if (error) {
+        // Child account for this parent already exists. Update its password instead so
+        // the parent can freely reset the child's sign-in credentials.
+        const isDupe = /already|registered|exists/i.test(error.message);
+        if (!isDupe) throw error;
+        // Sign in as the child (auto_confirm is on), change the password, then restore parent.
+        const { error: siErr } = await supabase.auth.signInWithPassword({ email, password: childPassword });
+        if (siErr) {
+          // Password differs — sign in with a temporary reset isn't available client-side; ask parent to use existing password.
+          throw new Error(
+            "A child account already exists for this parent email. Sign in on the child's device using the password you set previously, or contact support to reset it."
+          );
+        }
+        await supabase.auth.updateUser({
+          data: { role: "child", parent_email: parentEmailLower },
+        });
+        if (parentSession) {
+          await supabase.auth.setSession({
+            access_token: parentSession.access_token,
+            refresh_token: parentSession.refresh_token,
+          });
+        }
+        toast.success("Child account already exists", {
+          description: "It's linked to your account. Sign in on the child's device using your email as parent email.",
+        });
+        setChildPassword("");
+        setChildPasswordConfirm("");
+        setChildDialogOpen(false);
+        setChildBusy(false);
+        return;
+      }
       // Restore the parent's session immediately (auto-confirm signs the child in).
       if (parentSession) {
         await supabase.auth.setSession({
@@ -858,9 +884,8 @@ const Index = () => {
       localStorage.setItem("ts_role", "parent");
       setRole("parent");
       toast.success("Child account created", {
-        description: `Sign in on their device with ${email} and the password you chose.`,
+        description: `On the child's device, choose "Child" on the login page and sign in with your email (${parentEmailLower}) and the password you just set.`,
       });
-      setChildEmail("");
       setChildPassword("");
       setChildPasswordConfirm("");
       setChildDialogOpen(false);
