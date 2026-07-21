@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -602,11 +603,11 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">Unlock code</Label>
-                <Input type="password" value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="At least 4 characters" />
+                <PasswordInput value={newPin} onChange={(e) => setNewPin(e.target.value)} placeholder="At least 4 characters" />
               </div>
               <div>
                 <Label className="text-xs">Confirm code</Label>
-                <Input type="password" value={newPin2} onChange={(e) => setNewPin2(e.target.value)} placeholder="Repeat" />
+                <PasswordInput value={newPin2} onChange={(e) => setNewPin2(e.target.value)} placeholder="Repeat" />
               </div>
             </div>
             {isWebAuthnSupported() && (
@@ -631,16 +632,16 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
             <p className="text-xs text-muted-foreground">Enter your current unlock code, then set a new one. Fingerprint cannot be used to authorize this change.</p>
             <div>
               <Label className="text-xs">Current unlock code</Label>
-              <Input type="password" value={currentPin} onChange={(e) => setCurrentPin(e.target.value)} placeholder="Current code" autoComplete="current-password" />
+              <PasswordInput value={currentPin} onChange={(e) => setCurrentPin(e.target.value)} placeholder="Current code" autoComplete="current-password" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs">New code</Label>
-                <Input type="password" value={changePin} onChange={(e) => setChangePin(e.target.value)} placeholder="At least 4 characters" autoComplete="new-password" />
+                <PasswordInput value={changePin} onChange={(e) => setChangePin(e.target.value)} placeholder="At least 4 characters" autoComplete="new-password" />
               </div>
               <div>
                 <Label className="text-xs">Confirm new code</Label>
-                <Input type="password" value={changePin2} onChange={(e) => setChangePin2(e.target.value)} placeholder="Repeat" autoComplete="new-password" />
+                <PasswordInput value={changePin2} onChange={(e) => setChangePin2(e.target.value)} placeholder="Repeat" autoComplete="new-password" />
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -661,8 +662,7 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
               <div className="text-xs text-muted-foreground">Enter your unlock code {fingerprintReady ? "or use your fingerprint" : ""} to view saved passwords.</div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
-              <Input
-                type="password"
+              <PasswordInput
                 value={unlockPin}
                 onChange={(e) => setUnlockPin(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") tryUnlockPin(); }}
@@ -690,7 +690,7 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
           </div>
           <div>
             <Label className="text-xs">Password</Label>
-            <Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="password to remember" autoComplete="off" />
+            <PasswordInput value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="password to remember" autoComplete="off" />
           </div>
           <div>
             <Label className="text-xs">Notes</Label>
