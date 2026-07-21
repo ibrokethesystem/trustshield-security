@@ -4071,6 +4071,9 @@ function FamilyView({
                 const who = info
                   ? `${(info.label ?? "").replace(/-/g, " ") || "Child"} (${info.email})`
                   : "A linked child";
+                const noteLines = (r.note ?? "").split("\n");
+                const siteHost = noteLines[0]?.trim() || "";
+                const childReason = noteLines.slice(1).join("\n").trim();
                 return (
                   <li
                     key={r.id}
@@ -4085,11 +4088,16 @@ function FamilyView({
                           : r.kind === "unblock_site"
                           ? (
                               <span>
-                                Unblock <span className="font-mono break-all">{r.note || "(no site)"}</span>
+                                Unblock <span className="font-mono break-all">{siteHost || "(no site)"}</span>
                               </span>
                             )
                           : r.kind}
                       </div>
+                      {r.kind === "unblock_site" && childReason && (
+                        <div className="text-[11px] text-muted-foreground mt-1 whitespace-pre-wrap">
+                          <span className="font-semibold text-foreground">Their reason:</span> {childReason}
+                        </div>
+                      )}
                       <div className="text-[10px] text-muted-foreground">
                         From {who} · {new Date(r.created_at).toLocaleString()}
                       </div>
