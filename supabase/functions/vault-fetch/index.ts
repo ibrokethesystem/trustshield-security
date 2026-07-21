@@ -44,10 +44,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (setting?.lock_enabled && setting?.pin_hash && setting?.pin_salt) {
-      if (!pin) return json({ error: 'pin_required' }, 401);
+      if (!pin) return json({ error: 'pin_required' }, 200);
       const attempt = await sha256Hex(setting.pin_salt + ':' + pin);
       if (!timingSafeEqual(attempt, setting.pin_hash)) {
-        return json({ error: 'invalid_pin' }, 401);
+        return json({ error: 'invalid_pin' }, 200);
       }
     }
 
