@@ -72,20 +72,12 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
-    id: "2.1.0",
-    version: "2.1.0",
-    name: "Version switcher actually reverts",
-    date: "2026-07-21",
-    summary:
-      "Selecting an older version from the version pill now truly rolls back the UI to that release — features introduced later (QR scanner, File scanner tab, Threat Radar, Inbox, Device scanner, and more) hide themselves. Your newer code is saved and one click on \"Return to current\" brings it all back.",
-  },
-  {
     id: "2.0.0",
     version: "2.0.0",
     name: "QR scanner + Trust Shield Extension 2.0",
     date: "2026-07-21",
     summary:
-      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains).",
+      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains). Version switcher now truly reverts the UI to older releases — features added after the selected version hide themselves, and \"Return to current\" restores everything.",
   },
   {
     id: "1.9.9",
