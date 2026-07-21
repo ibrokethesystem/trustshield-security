@@ -61,6 +61,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
+import trustShieldLogo from "@/assets/trust-shield-logo.png";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
