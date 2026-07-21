@@ -3150,6 +3150,28 @@ function FamilyView({
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
   const removeChild = async (childEmail: string) => {
+    // Permanently delete the child auth user (and all their data) via the
+    // family-remove-child edge function. This prevents anyone from signing back
+    // into that child account.
+    try {
+      const { data, error } = await supabase.functions.invoke("family-remove-child", {
+        body: { child_email: childEmail },
+      });
+      const errMsg = (error as { message?: string } | null)?.message
+        ?? (data as { error?: string } | null)?.error;
+      if (errMsg) {
+        toast.error("Couldn't delete child account", { description: errMsg });
+        setConfirmRemove(null);
+        return;
+      }
+    } catch (e) {
+      toast.error("Couldn't delete child account", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      });
+      setConfirmRemove(null);
+      return;
+    }
+
     const next = children.filter((c) => c !== childEmail);
     setChildren(next);
     localStorage.setItem(`ts_family_children_${parentEmail}`, JSON.stringify(next));
@@ -3164,38 +3186,13 @@ function FamilyView({
     } catch {
       /* ignore */
     }
-    // Also clear the by-email child->parent pointer if present.
     localStorage.removeItem(`ts_child_parent_by_email_${childEmail}`);
-    // Wipe the child's browsing history & banned sites from the backend so it
-    // doesn't linger if the same child is re-linked later.
-    try {
-      const { data: link } = await supabase
-        .from("child_links")
-        .select("child_id")
-        .eq("parent_id", parentUserId ?? "")
-        .ilike("child_email", childEmail)
-        .maybeSingle();
-      const childId = link?.child_id as string | undefined;
-      if (childId) {
-        await supabase.from("child_activity").delete().eq("user_id", childId);
-        await supabase.from("child_banned_sites").delete().eq("user_id", childId);
-        await supabase.from("child_links").delete().eq("child_id", childId);
-      } else {
-        // Fallback: no link row found by email (case/whitespace mismatch or
-        // link already gone). Best-effort: drop any link rows this parent has
-        // matching that email so the monitor stops showing the child.
-        await supabase
-          .from("child_links")
-          .delete()
-          .eq("parent_id", parentUserId ?? "")
-          .ilike("child_email", childEmail);
-      }
-    } catch {
-      /* non-fatal */
-    }
     setConfirmRemove(null);
     onRefresh();
-    toast.success(`Removed ${childEmail} from family`);
+    onChildrenChange?.(next.length);
+    toast.success(`Deleted ${childEmail}`, {
+      description: "Their Trust Shield account, browsing history, and banned sites are gone.",
+    });
   };
 
   const downloadChildExtension = () => {
