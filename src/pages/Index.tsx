@@ -1536,6 +1536,16 @@ const Index = () => {
               setGuardianPrefill("How can I set up a child extension?");
               setView("guardian");
             }}
+            onChildrenChange={(count) => {
+              if (count === 0 && user) {
+                const roleKey = `ts_role_${user.id}`;
+                localStorage.setItem(roleKey, "solo");
+                localStorage.setItem("ts_role", "solo");
+                setRole("solo");
+                setFamilyAlerts([]);
+                setView("dashboard");
+              }
+            }}
           />
         ) : (
           <GuardianView
