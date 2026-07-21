@@ -2098,6 +2098,12 @@ function NetworkScanView() {
     downlink?: number;
     rtt?: number;
   } | null>(null);
+  const [showDevices, setShowDevices] = useState<boolean>(() => hasFeatureAt("1.9.9"));
+  useEffect(() => {
+    const update = () => setShowDevices(hasFeatureAt("1.9.9"));
+    window.addEventListener("ts:version-change", update);
+    return () => window.removeEventListener("ts:version-change", update);
+  }, []);
 
   useEffect(() => {
     setHttps(window.location.protocol === "https:");
@@ -2272,7 +2278,7 @@ function NetworkScanView() {
         </Card>
       )}
 
-      <DeviceScanner />
+      {showDevices && <DeviceScanner />}
 
       <Card>
         <h4 className="font-semibold text-sm mb-2">What this can't check</h4>
