@@ -335,6 +335,7 @@ const Index = () => {
     if (n.minVersion && !hasFeature(n.minVersion)) return false;
     if (role === "child" && n.hideForChild) return false;
     if (n.parentOnly && role !== "parent") return false;
+    if (n.childOnly && role !== "child") return false;
     return true;
   });
   // Dev feature auto-removes at v2.5.0 per spec.
@@ -1560,6 +1561,8 @@ const Index = () => {
               }
             }}
           />
+        ) : view === "cyberedu" ? (
+          <CyberEduView userId={user?.id} />
         ) : (
           <GuardianView
             threats={threats ?? []}
