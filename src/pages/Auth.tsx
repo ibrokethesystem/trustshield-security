@@ -14,6 +14,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [isChild, setIsChild] = useState(false);
+  const [parentEmail, setParentEmail] = useState("");
 
   useEffect(() => {
     document.title = mode === "signup" ? "Sign up · Trust Shield" : "Sign in · Trust Shield";
@@ -31,12 +33,29 @@ const Auth = () => {
     setBusy(true);
     try {
       if (mode === "signup") {
+        if (isChild) {
+          const pe = parentEmail.trim().toLowerCase();
+          if (!pe || !pe.includes("@")) {
+            toast.error("Enter your parent's email");
+            setBusy(false);
+            return;
+          }
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: {
+            emailRedirectTo: window.location.origin,
+            data: isChild
+              ? { role: "child", parent_email: parentEmail.trim().toLowerCase() }
+              : undefined,
+          },
         });
         if (error) throw error;
+        if (isChild) {
+          // Preserve linkage for the role effect on first login.
+          localStorage.setItem("ts_pending_child_signup", parentEmail.trim().toLowerCase());
+        }
         // Require explicit log in after account creation
         await supabase.auth.signOut();
         toast.success("Account created", { description: "Please log in to continue." });
@@ -98,6 +117,29 @@ const Auth = () => {
             </button>
           </div>
 
+          {mode === "signup" && (
+            <div className="flex gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setIsChild(false)}
+                className={`flex-1 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  !isChild ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"
+                }`}
+              >
+                Adult
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsChild(true)}
+                className={`flex-1 py-2 rounded-md text-xs font-medium border transition-colors ${
+                  isChild ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground"
+                }`}
+              >
+                Child
+              </button>
+            </div>
+          )}
+
           <Button
             onClick={handleGoogle}
             disabled={busy}
@@ -120,6 +162,23 @@ const Auth = () => {
           </div>
 
           <form onSubmit={handleEmail} className="space-y-4">
+            {mode === "signup" && isChild && (
+              <div>
+                <Label htmlFor="parent-email">Parent's email</Label>
+                <Input
+                  id="parent-email"
+                  type="email"
+                  value={parentEmail}
+                  onChange={(e) => setParentEmail(e.target.value)}
+                  required
+                  placeholder="parent@example.com"
+                  className="bg-secondary border-border"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Your alerts will be shared with this parent account.
+                </p>
+              </div>
+            )}
             <div>
               <Label htmlFor="email">Email</Label>
               <Input
