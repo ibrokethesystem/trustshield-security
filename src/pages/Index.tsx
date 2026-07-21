@@ -835,12 +835,51 @@ const Index = () => {
   const confirmChildSignOut = async () => {
     if (!user?.email || !signOutPassword) return;
     setSignOutBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: signOutPassword,
-    });
+    const emails = new Set<string>();
+    const addEmail = (email?: string | null) => {
+      const clean = email?.trim().toLowerCase();
+      if (clean && clean.includes("@")) emails.add(clean);
+    };
+    addEmail(user.email);
+
+    // Child accounts have had a few sign-in formats during v2.0 (legacy single-child,
+    // named multi-child, and renamed display labels). Try every safe account email we
+    // can derive before calling the password wrong, so valid child passwords do not trap
+    // the child in the app after a rename or extension-pairing change.
+    const meta = (user.user_metadata ?? {}) as { parent_email?: string; child_label?: string; child_name?: string };
+    const parentForChild = (parentEmail || meta.parent_email || localStorage.getItem(`ts_parent_email_${user.id}`) || "")
+      .trim()
+      .toLowerCase();
+    if (parentForChild) {
+      addEmail(await childEmailFor(parentForChild));
+      const possibleLabels = [meta.child_label, meta.child_name].map((v) => childLabelSlug(v ?? "")).filter(Boolean);
+      try {
+        const { data: link } = await supabase
+          .from("child_links")
+          .select("child_email, label")
+          .eq("child_id", user.id)
+          .maybeSingle();
+        addEmail(link?.child_email);
+        const linkLabel = childLabelSlug(link?.label ?? "");
+        if (linkLabel) possibleLabels.push(linkLabel);
+      } catch {
+        // Non-fatal: the direct auth email is still checked.
+      }
+      for (const label of Array.from(new Set(possibleLabels))) {
+        addEmail(await childEmailFor(parentForChild, label));
+      }
+    }
+
+    let verified = false;
+    for (const email of emails) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: signOutPassword });
+      if (!error) {
+        verified = true;
+        break;
+      }
+    }
     setSignOutBusy(false);
-    if (error) {
+    if (!verified) {
       toast.error("Wrong password", { description: "Ask your parent for help." });
       return;
     }
