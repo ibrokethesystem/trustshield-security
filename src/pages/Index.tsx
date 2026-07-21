@@ -2428,7 +2428,8 @@ function QrScannerView() {
   };
 
   return (
-    <Card className="p-6 space-y-4">
+    <Card>
+      <div className="space-y-4">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
           <QrCode className="w-5 h-5 text-primary" />
@@ -2514,6 +2515,7 @@ function QrScannerView() {
           )}
         </div>
       )}
+      </div>
     </Card>
   );
 }
