@@ -59,18 +59,20 @@
 </head>
 <body>
   <div class="card">
-    <div class="icon">⚠️</div>
-    <h1>Ask a grown-up first!</h1>
+    <div class="icon" id="icon">⚠️</div>
+    <h1 id="title">Ask a grown-up first!</h1>
     <div class="from">From Trust Shield</div>
-    <p class="sub">This site looks unsafe. Please close this tab and tell your parent or guardian before you keep going.</p>
+    <p class="sub" id="sub">This site looks unsafe. Please close this tab and tell your parent or guardian before you keep going.</p>
     <div class="url" id="url">—</div>
-    <div class="risk"><span>Risk</span><div class="bar"><div class="fill" id="fill" style="width:0%"></div></div><strong id="riskNum">0</strong></div>
+    <div class="risk" id="riskRow"><span>Risk</span><div class="bar"><div class="fill" id="fill" style="width:0%"></div></div><strong id="riskNum">0</strong></div>
     <div class="section-title">Why this looks risky</div>
     <ul id="reasons"></ul>
     <div class="btns">
       <button class="primary" id="back">← Go back and tell an adult</button>
+      <button class="ghost" id="askPerm">🙋 Ask for permission</button>
       <button class="ghost" id="allowOnce">Only continue with an adult</button>
     </div>
+    <div id="askStatus" style="margin-top:16px;font-size:14px;color:#fca5a5;"></div>
     <div class="foot">Trust Shield • Child Edition — always ask a grown-up</div>
   </div>
   <script src="warning.js"></script>
