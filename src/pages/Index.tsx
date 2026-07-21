@@ -3117,6 +3117,7 @@ function QrScannerView() {
 function FamilyView({
   alerts,
   parentEmail,
+  parentUserId,
   onRefresh,
   onClear,
 }: {
@@ -3129,6 +3130,7 @@ function FamilyView({
     summary?: string;
   }[];
   parentEmail: string;
+  parentUserId?: string;
   onRefresh: () => void;
   onClear: () => void;
 }) {
