@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Shield, Ban, Globe, Trash2, RefreshCw, Link2 } from "lucide-react";
+import { Loader2, Shield, Ban, Globe, Trash2, RefreshCw, Link2, Users, Eraser } from "lucide-react";
 import { toast } from "sonner";
 
 type ChildLink = { child_id: string; child_email: string | null };
 type Activity = { id: string; host: string; url: string; risk: number; blocked: boolean; created_at: string };
 type Ban = { id: string; host: string; created_at: string };
+type ChildStats = { activity: number; bans: number; lastSeen: string | null };
 
 function normalizeHost(input: string) {
   const t = input.trim().toLowerCase();
@@ -29,6 +30,8 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
   const [newBan, setNewBan] = useState("");
   const [loading, setLoading] = useState(false);
   const [linking, setLinking] = useState(false);
+  const [stats, setStats] = useState<Record<string, ChildStats>>({});
+  const [clearing, setClearing] = useState(false);
 
   const loadLinks = useCallback(async () => {
     if (!parentUserId) return;
@@ -66,8 +69,27 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
     }
   }, []);
 
+  const loadStats = useCallback(async (childIds: string[]) => {
+    const out: Record<string, ChildStats> = {};
+    await Promise.all(childIds.map(async (id) => {
+      const [{ count: aCount }, { count: bCount }, { data: latest }] = await Promise.all([
+        supabase.from("child_activity").select("id", { count: "exact", head: true }).eq("user_id", id),
+        supabase.from("child_banned_sites").select("id", { count: "exact", head: true }).eq("user_id", id),
+        supabase.from("child_activity").select("created_at").eq("user_id", id)
+          .order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      ]);
+      out[id] = {
+        activity: aCount ?? 0,
+        bans: bCount ?? 0,
+        lastSeen: (latest?.created_at as string | undefined) ?? null,
+      };
+    }));
+    setStats(out);
+  }, []);
+
   useEffect(() => { loadLinks(); }, [loadLinks]);
   useEffect(() => { if (selected) loadChildData(selected); }, [selected, loadChildData]);
+  useEffect(() => { if (links.length) loadStats(links.map((l) => l.child_id)); }, [links, loadStats]);
 
   // Realtime: notify the parent whenever a linked child visits a risky/blocked site.
   useEffect(() => {
@@ -142,6 +164,18 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
     loadChildData(selected);
   };
 
+  const clearHistory = async () => {
+    if (!selected) return;
+    if (!confirm("Erase all browsing history for this child? This can't be undone.")) return;
+    setClearing(true);
+    const { error } = await supabase.from("child_activity").delete().eq("user_id", selected);
+    setClearing(false);
+    if (error) return toast.error("Couldn't clear history", { description: error.message });
+    toast.success("Search history cleared");
+    setActivity([]);
+    loadStats(links.map((l) => l.child_id));
+  };
+
   return (
     <Card>
       <div className="flex items-start gap-3">
@@ -168,6 +202,37 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
         </p>
       ) : (
         <>
+          <div className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="w-4 h-4 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Your children ({links.length})</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {links.map((l) => {
+                const s = stats[l.child_id];
+                const isSel = selected === l.child_id;
+                return (
+                  <button
+                    key={l.child_id}
+                    onClick={() => setSelected(l.child_id)}
+                    className={`text-left p-2.5 rounded-lg border transition ${
+                      isSel ? "border-primary bg-primary/10" : "border-border bg-card/40 hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="text-xs font-semibold truncate">{l.child_email ?? l.child_id.slice(0, 8)}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>{s?.activity ?? 0} searches</span>
+                      <span>{s?.bans ?? 0} banned</span>
+                      <span>
+                        {s?.lastSeen ? `Last: ${new Date(s.lastSeen).toLocaleString()}` : "No activity yet"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {links.map((l) => (
               <button
@@ -191,6 +256,16 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
             >
               <RefreshCw className={`w-3 h-3 mr-1 ${loading ? "animate-spin" : ""}`} />
               Refresh
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-destructive hover:text-destructive"
+              onClick={clearHistory}
+              disabled={!selected || clearing || activity.length === 0}
+            >
+              {clearing ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Eraser className="w-3 h-3 mr-1" />}
+              Clear history
             </Button>
           </div>
 

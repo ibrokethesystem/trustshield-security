@@ -1848,6 +1848,34 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childEmail: string }) {
   const hasParent = !!parentEmail;
+  const [pwd, setPwd] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const deleteSelf = async () => {
+    setDeleting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("child-self-delete", {
+        body: { password: pwd },
+      });
+      const errMsg = (error as { message?: string } | null)?.message
+        ?? (data as { error?: string } | null)?.error;
+      if (errMsg) {
+        toast.error("Couldn't delete account", { description: errMsg });
+        setDeleting(false);
+        return;
+      }
+      toast.success("Account deleted. Goodbye!");
+      await supabase.auth.signOut();
+      window.location.href = "/auth";
+    } catch (e) {
+      toast.error("Couldn't delete account", {
+        description: e instanceof Error ? e.message : "Unexpected error",
+      });
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -1891,6 +1919,58 @@ function MyParentView({ parentEmail, childEmail }: { parentEmail: string; childE
           </ul>
         </div>
       </Card>
+
+      <Card>
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-destructive/10 border border-destructive/30 flex items-center justify-center">
+            <Trash2 className="w-5 h-5 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-semibold">Delete my account</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              This erases your Trust Shield account, your searches, and your banned sites forever. Enter your
+              password to confirm. Once you press delete, you can't get it back — even your grown-up can't undo this.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto] max-w-md">
+          <PasswordInput
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            placeholder="Your password"
+            autoComplete="current-password"
+          />
+          <Button
+            variant="destructive"
+            disabled={deleting || pwd.length < 4}
+            onClick={() => setConfirmOpen(true)}
+          >
+            {deleting ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Trash2 className="w-4 h-4 mr-1" />}
+            Delete my account
+          </Button>
+        </div>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your Trust Shield account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently erases <span className="font-semibold">{childEmail}</span>, your browsing history,
+              and your banned sites. You'll be signed out and won't be able to sign back in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { setConfirmOpen(false); deleteSelf(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
