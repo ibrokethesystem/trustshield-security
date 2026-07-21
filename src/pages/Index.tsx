@@ -257,6 +257,59 @@ const Index = () => {
   const [shareOpen, setShareOpen] = useState(false);
   const [appInstalled, setAppInstalled] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
+  const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("ts_dev_unlocked") === "1";
+  });
+  const [devInput, setDevInput] = useState("");
+  const [selectedVersion, setSelectedVersion] = useState<string>(() => {
+    if (typeof window === "undefined") return UPDATES[0]?.version ?? "2.0.0";
+    return localStorage.getItem("ts_active_version") || (UPDATES[0]?.version ?? "2.0.0");
+  });
+  const latestVersion = UPDATES[0]?.version ?? "2.0.0";
+  const cmpVersion = (a: string, b: string) => {
+    const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+    const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+    }
+    return 0;
+  };
+  // Dev feature auto-removes at v2.5.0 per spec.
+  const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
+  const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
+  const visibleVersions = UPDATES.filter((u) =>
+    effectiveDevUnlocked ? true : cmpVersion(u.version, "2.0.0") >= 0,
+  );
+  const applyVersion = (v: string) => {
+    setSelectedVersion(v);
+    localStorage.setItem("ts_active_version", v);
+    setVersionMenuOpen(false);
+    if (v === latestVersion) {
+      toast.success(`On the latest version (v${v})`);
+    } else {
+      toast(`Reverted to v${v}`, {
+        description: "This is a UI-level version marker — code stays on the latest build.",
+      });
+    }
+  };
+  const tryDevUnlock = () => {
+    if (devInput === "TrustShieldDevs1357908642)*^$@!#%&(") {
+      localStorage.setItem("ts_dev_unlocked", "1");
+      setDevUnlocked(true);
+      setDevInput("");
+      toast.success("Developer mode unlocked — all past versions visible.");
+    } else {
+      toast.error("Incorrect developer code");
+    }
+  };
+  useEffect(() => {
+    if (devUnlocked && !devFeatureAvailable) {
+      localStorage.removeItem("ts_dev_unlocked");
+      setDevUnlocked(false);
+    }
+  }, [devUnlocked, devFeatureAvailable]);
   const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("ts_last_read_update") ?? null;
@@ -780,12 +833,82 @@ const Index = () => {
               <Share2 className="w-4 h-4" />
               Share
             </Button>
-            <div
-              className="flex items-center px-2.5 py-1.5 rounded-full text-xs font-mono border border-border bg-muted/40 text-muted-foreground"
-              title="App version"
-            >
-              v{UPDATES[0]?.version} <span className="ml-1 text-green-400">(current)</span>
-            </div>
+            <Popover open={versionMenuOpen} onOpenChange={setVersionMenuOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  title="Change version"
+                  className="flex items-center px-2.5 py-1.5 rounded-full text-xs font-mono border border-border bg-muted/40 text-muted-foreground hover:bg-muted/70 transition-colors"
+                >
+                  v{selectedVersion}
+                  {selectedVersion === latestVersion && (
+                    <span className="ml-1 text-green-400">(current)</span>
+                  )}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="bottom" align="end" className="w-80 p-0">
+                <div className="p-3 border-b border-border">
+                  <div className="text-sm font-semibold">Switch version</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Revert the Trust Shield UI to a previous release.
+                  </div>
+                </div>
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {visibleVersions.map((u) => {
+                    const isActive = u.version === selectedVersion;
+                    const isLatest = u.version === latestVersion;
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => applyVersion(u.version)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 hover:bg-muted/60 transition-colors flex items-start gap-2",
+                          isActive && "bg-muted/40",
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium flex items-center gap-1.5">
+                            v{u.version}
+                            {isLatest && <span className="text-[10px] text-green-400">(current)</span>}
+                            {isActive && !isLatest && (
+                              <span className="text-[10px] text-primary">(active)</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">{u.name}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {devFeatureAvailable && !effectiveDevUnlocked && (
+                  <div className="p-3 border-t border-border space-y-2">
+                    <div className="text-[11px] text-muted-foreground">
+                      Only versions 2.0.0 and newer are shown. Developers can unlock all past versions.
+                    </div>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="password"
+                        value={devInput}
+                        onChange={(e) => setDevInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") tryDevUnlock();
+                        }}
+                        placeholder="Developer code"
+                        className="flex-1 min-w-0 px-2 py-1 rounded border border-border bg-background text-xs"
+                      />
+                      <Button size="sm" variant="outline" onClick={tryDevUnlock}>
+                        Unlock
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {effectiveDevUnlocked && (
+                  <div className="p-2 border-t border-border text-[11px] text-primary text-center">
+                    Developer mode — all versions unlocked
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
             <div
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
