@@ -304,10 +304,7 @@ const Index = () => {
   const [appInstalled, setAppInstalled] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [versionMenuOpen, setVersionMenuOpen] = useState(false);
-  const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("ts_dev_unlocked") === "1";
-  });
+  const [devUnlocked, setDevUnlocked] = useState<boolean>(false);
   const [devInput, setDevInput] = useState("");
   const [selectedVersion, setSelectedVersion] = useState<string>(() => {
     if (typeof window === "undefined") return UPDATES[0]?.version ?? "2.0.0";
@@ -353,22 +350,36 @@ const Index = () => {
       });
     }
   };
+  const devKey = user ? `ts_dev_unlocked_${user.id}` : null;
   const tryDevUnlock = () => {
+    if (!devKey) {
+      toast.error("Sign in to unlock developer mode");
+      return;
+    }
     if (devInput === "TrustShieldDevs1357908642)*^$@!#%&(") {
-      localStorage.setItem("ts_dev_unlocked", "1");
+      localStorage.setItem(devKey, "1");
       setDevUnlocked(true);
       setDevInput("");
-      toast.success("Developer mode unlocked — all past versions visible.");
+      toast.success("Developer mode unlocked for this account.");
     } else {
       toast.error("Incorrect developer code");
     }
   };
   useEffect(() => {
-    if (devUnlocked && !devFeatureAvailable) {
-      localStorage.removeItem("ts_dev_unlocked");
+    // Dev mode is per-account. Legacy global flag is cleared to prevent leaking across accounts.
+    if (typeof window !== "undefined") localStorage.removeItem("ts_dev_unlocked");
+    if (!devKey) {
+      setDevUnlocked(false);
+      return;
+    }
+    setDevUnlocked(localStorage.getItem(devKey) === "1");
+  }, [devKey]);
+  useEffect(() => {
+    if (devUnlocked && !devFeatureAvailable && devKey) {
+      localStorage.removeItem(devKey);
       setDevUnlocked(false);
     }
-  }, [devUnlocked, devFeatureAvailable]);
+  }, [devUnlocked, devFeatureAvailable, devKey]);
   const [lastReadUpdateId, setLastReadUpdateId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("ts_last_read_update") ?? null;
