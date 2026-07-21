@@ -1666,6 +1666,39 @@ const Index = () => {
       </Dialog>
 
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} />
+
+      <Dialog open={signOutOpen} onOpenChange={(o) => !signOutBusy && setSignOutOpen(o)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Confirm sign out</DialogTitle>
+            <DialogDescription>
+              Enter your password to sign out of your child account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="child-signout-pw">Password</Label>
+            <Input
+              id="child-signout-pw"
+              type="password"
+              value={signOutPassword}
+              onChange={(e) => setSignOutPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void confirmChildSignOut();
+              }}
+              placeholder="Your password"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignOutOpen(false)} disabled={signOutBusy}>
+              Cancel
+            </Button>
+            <Button onClick={confirmChildSignOut} disabled={signOutBusy || !signOutPassword}>
+              {signOutBusy ? "Checking…" : "Sign out"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
