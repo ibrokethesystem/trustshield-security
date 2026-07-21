@@ -2,12 +2,13 @@
   "manifest_version": 3,
   "name": "Trust Shield \u2014 Child Edition",
   "version": "2.0.0",
-  "description": "Kid-safe browser guard \u2014 warns your child before dangerous sites and tells them to ask a parent.",
+  "description": "Kid-safe browser guard \u2014 warns your child before dangerous sites, syncs banned sites from a parent, and reports activity to the parent's Trust Shield.",
   "permissions": [
     "webNavigation",
     "tabs",
     "storage",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -20,6 +21,7 @@
       "128": "icon128.png"
     }
   },
+  "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
   },

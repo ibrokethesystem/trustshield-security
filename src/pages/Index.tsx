@@ -69,6 +69,7 @@ import ThreatRadarView from "@/components/ThreatRadarView";
 import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { childEmailFor } from "@/lib/childAuth";
+import { ChildMonitoring } from "@/components/ChildMonitoring";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -928,6 +929,16 @@ const Index = () => {
       if (childId) {
         localStorage.setItem(`ts_role_${childId}`, "child");
         localStorage.setItem(`ts_parent_email_${childId}`, parentEmailLower);
+        // Register the parent↔child link in the backend so the Family tab
+        // can pull the child's browsing activity and manage banned sites.
+        try {
+          await supabase
+            .from("child_links")
+            .upsert(
+              { parent_id: user.id, child_id: childId, child_email: email },
+              { onConflict: "child_id" },
+            );
+        } catch { /* non-fatal */ }
       }
       // Promote current (parent) user to parent role.
       localStorage.setItem(`ts_role_${user.id}`, "parent");
@@ -1513,6 +1524,7 @@ const Index = () => {
           <FamilyView
             alerts={familyAlerts}
             parentEmail={(user?.email ?? "").toLowerCase()}
+            parentUserId={user?.id}
             onRefresh={loadFamilyAlerts}
             onClear={() => {
               if (!user) return;
@@ -3105,6 +3117,7 @@ function QrScannerView() {
 function FamilyView({
   alerts,
   parentEmail,
+  parentUserId,
   onRefresh,
   onClear,
 }: {
@@ -3117,6 +3130,7 @@ function FamilyView({
     summary?: string;
   }[];
   parentEmail: string;
+  parentUserId?: string;
   onRefresh: () => void;
   onClear: () => void;
 }) {
@@ -3174,6 +3188,7 @@ function FamilyView({
 
   return (
     <div className="space-y-4">
+      <ChildMonitoring parentUserId={parentUserId} />
       <Card>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">

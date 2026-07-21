@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      child_activity: {
+        Row: {
+          blocked: boolean
+          created_at: string
+          host: string
+          id: string
+          risk: number
+          url: string
+          user_id: string
+        }
+        Insert: {
+          blocked?: boolean
+          created_at?: string
+          host: string
+          id?: string
+          risk?: number
+          url: string
+          user_id: string
+        }
+        Update: {
+          blocked?: boolean
+          created_at?: string
+          host?: string
+          id?: string
+          risk?: number
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      child_banned_sites: {
+        Row: {
+          created_at: string
+          host: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          host: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          host?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      child_links: {
+        Row: {
+          child_email: string | null
+          child_id: string
+          created_at: string
+          id: string
+          parent_id: string
+        }
+        Insert: {
+          child_email?: string | null
+          child_id: string
+          created_at?: string
+          id?: string
+          parent_id: string
+        }
+        Update: {
+          child_email?: string | null
+          child_id?: string
+          created_at?: string
+          id?: string
+          parent_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -240,7 +315,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_parent_of: { Args: { _child: string }; Returns: boolean }
     }
     Enums: {
       threat_severity: "low" | "medium" | "high" | "critical"

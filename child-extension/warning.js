@@ -4,6 +4,7 @@ const risk = parseInt(params.get("risk") || "0", 10);
 let reasons = [];
 try { reasons = JSON.parse(params.get("reasons") || "[]"); } catch {}
 const blocked = params.get("blocked") === "1";
+const parentBanned = params.get("parentBanned") === "1";
 
 let host = "";
 try { host = new URL(target).hostname; } catch {}
@@ -11,7 +12,8 @@ try { host = new URL(target).hostname; } catch {}
 document.getElementById("url").textContent = target;
 document.getElementById("riskNum").textContent = risk + "/100";
 document.getElementById("fill").style.width = Math.max(10, risk) + "%";
-if (blocked) document.getElementById("title").textContent = "You blocked this site earlier";
+if (parentBanned) document.getElementById("title").textContent = "Your parent banned this website";
+else if (blocked) document.getElementById("title").textContent = "You blocked this site earlier";
 
 const ul = document.getElementById("reasons");
 if (!reasons.length) {
@@ -37,12 +39,19 @@ document.getElementById("back").addEventListener("click", () => {
 });
 
 document.getElementById("allowOnce").addEventListener("click", async () => {
-  // Add to allowlist for this session-ish then navigate.
-  await chrome.runtime.sendMessage({ type: "allow-always", host }); // simplest: allow-always so we don't loop
+  const resp = await chrome.runtime.sendMessage({ type: "allow-always", host });
+  if (resp && resp.ok === false && resp.reason === "parent_banned") {
+    alert("Your parent has banned this website. Ask them to unban it in Trust Shield.");
+    return;
+  }
   location.href = target;
 });
 
 document.getElementById("allowAlways").addEventListener("click", async () => {
-  await chrome.runtime.sendMessage({ type: "allow-always", host });
+  const resp = await chrome.runtime.sendMessage({ type: "allow-always", host });
+  if (resp && resp.ok === false && resp.reason === "parent_banned") {
+    alert("Your parent has banned this website. Ask them to unban it in Trust Shield.");
+    return;
+  }
   location.href = target;
 });

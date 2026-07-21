@@ -1,0 +1,257 @@
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Loader2, Shield, Ban, Globe, Trash2, RefreshCw, Link2 } from "lucide-react";
+import { toast } from "sonner";
+
+type ChildLink = { child_id: string; child_email: string | null };
+type Activity = { id: string; host: string; url: string; risk: number; blocked: boolean; created_at: string };
+type Ban = { id: string; host: string; created_at: string };
+
+function normalizeHost(input: string) {
+  const t = input.trim().toLowerCase();
+  if (!t) return "";
+  try {
+    const u = new URL(t.startsWith("http") ? t : `https://${t}`);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return t.replace(/^www\./, "").replace(/\/.*$/, "");
+  }
+}
+
+export function ChildMonitoring({ parentUserId }: { parentUserId: string | undefined }) {
+  const [links, setLinks] = useState<ChildLink[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [activity, setActivity] = useState<Activity[]>([]);
+  const [bans, setBans] = useState<Ban[]>([]);
+  const [newBan, setNewBan] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  const loadLinks = useCallback(async () => {
+    if (!parentUserId) return;
+    const { data, error } = await supabase
+      .from("child_links")
+      .select("child_id,child_email")
+      .eq("parent_id", parentUserId)
+      .order("created_at", { ascending: true });
+    if (error) return;
+    setLinks(data ?? []);
+    if (!selected && data && data.length) setSelected(data[0].child_id);
+  }, [parentUserId, selected]);
+
+  const loadChildData = useCallback(async (childId: string) => {
+    setLoading(true);
+    try {
+      const [{ data: acts }, { data: bs }] = await Promise.all([
+        supabase
+          .from("child_activity")
+          .select("id,host,url,risk,blocked,created_at")
+          .eq("user_id", childId)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("child_banned_sites")
+          .select("id,host,created_at")
+          .eq("user_id", childId)
+          .order("created_at", { ascending: false }),
+      ]);
+      setActivity((acts ?? []) as Activity[]);
+      setBans((bs ?? []) as Ban[]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadLinks(); }, [loadLinks]);
+  useEffect(() => { if (selected) loadChildData(selected); }, [selected, loadChildData]);
+
+  const linkExisting = async () => {
+    setLinking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("family-link-child", { body: {} });
+      if (error) throw error;
+      if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+      toast.success("Child linked for monitoring");
+      await loadLinks();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not link child");
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const addBan = async () => {
+    if (!selected) return;
+    const host = normalizeHost(newBan);
+    if (!host) return toast.error("Enter a valid domain");
+    const { error } = await supabase
+      .from("child_banned_sites")
+      .insert({ user_id: selected, host });
+    if (error) return toast.error(error.message);
+    setNewBan("");
+    toast.success(`Banned ${host} for your child`);
+    loadChildData(selected);
+  };
+
+  const removeBan = async (id: string) => {
+    const { error } = await supabase.from("child_banned_sites").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    if (selected) loadChildData(selected);
+  };
+
+  const banFromActivity = async (host: string) => {
+    if (!selected) return;
+    const h = normalizeHost(host);
+    if (!h) return;
+    const { error } = await supabase.from("child_banned_sites").insert({ user_id: selected, host: h });
+    if (error && !error.message.includes("duplicate")) return toast.error(error.message);
+    toast.success(`Banned ${h}`);
+    loadChildData(selected);
+  };
+
+  return (
+    <Card>
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center">
+          <Shield className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-xl font-bold">Child browsing monitor</h2>
+          <p className="text-sm text-muted-foreground">
+            View websites your child visits with the Trust Shield — Child Edition extension, and ban any site
+            you don't want them to access. Banned sites are enforced by the extension in real time.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={linkExisting} disabled={linking}>
+          {linking ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Link2 className="w-3 h-3 mr-1" />}
+          Link existing child
+        </Button>
+      </div>
+
+      {links.length === 0 ? (
+        <p className="text-xs text-muted-foreground mt-4">
+          No linked child accounts in the backend yet. Create a child account from the dashboard, or press
+          "Link existing child" to attach one you created earlier.
+        </p>
+      ) : (
+        <>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {links.map((l) => (
+              <button
+                key={l.child_id}
+                onClick={() => setSelected(l.child_id)}
+                className={`text-xs px-2.5 py-1 rounded-full border ${
+                  selected === l.child_id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-secondary/40 border-border text-muted-foreground"
+                }`}
+              >
+                {l.child_email ?? l.child_id.slice(0, 8)}
+              </button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => selected && loadChildData(selected)}
+              disabled={!selected || loading}
+            >
+              <RefreshCw className={`w-3 h-3 mr-1 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="p-3 rounded-lg border border-border bg-card/40">
+              <div className="flex items-center gap-2 mb-2">
+                <Globe className="w-4 h-4 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wider">Recent searches</span>
+              </div>
+              {activity.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No activity yet. Install the child extension and pair it from its options page.
+                </p>
+              ) : (
+                <ul className="space-y-1.5 max-h-72 overflow-auto">
+                  {activity.map((a) => (
+                    <li key={a.id} className="text-xs flex items-start gap-2">
+                      <span
+                        className={`inline-block w-1.5 h-1.5 mt-1.5 rounded-full shrink-0 ${
+                          a.blocked ? "bg-destructive" : a.risk >= 30 ? "bg-yellow-500" : "bg-primary/60"
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-medium truncate">{a.host}</span>
+                          {a.blocked && (
+                            <span className="text-[9px] uppercase tracking-wider text-destructive">blocked</span>
+                          )}
+                          <span className="text-[10px] text-muted-foreground ml-auto shrink-0">
+                            risk {a.risk}
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground truncate">{a.url}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {new Date(a.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-[10px] text-destructive hover:text-destructive"
+                        onClick={() => banFromActivity(a.host)}
+                      >
+                        <Ban className="w-3 h-3 mr-1" /> Ban
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-card/40">
+              <div className="flex items-center gap-2 mb-2">
+                <Ban className="w-4 h-4 text-destructive" />
+                <span className="text-xs font-semibold uppercase tracking-wider">Banned sites</span>
+              </div>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="example.com"
+                  value={newBan}
+                  onChange={(e) => setNewBan(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addBan()}
+                  className="h-8 text-xs"
+                />
+                <Button size="sm" className="h-8" onClick={addBan}>Ban</Button>
+              </div>
+              {bans.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No banned sites yet. Sites you add here are enforced by your child's extension.
+                </p>
+              ) : (
+                <ul className="space-y-1 max-h-64 overflow-auto">
+                  {bans.map((b) => (
+                    <li key={b.id} className="text-xs flex items-center gap-2 justify-between">
+                      <span className="truncate">{b.host}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-destructive hover:text-destructive"
+                        onClick={() => removeBan(b.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
