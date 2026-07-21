@@ -66,6 +66,7 @@ import trustShieldLogo from "@/assets/trust-shield-logo.png";
 import PasswordsView from "@/components/PasswordsView";
 import FileScannerView from "@/components/FileScannerView";
 import ThreatRadarView from "@/components/ThreatRadarView";
+import { lovable } from "@/integrations/lovable/index";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
