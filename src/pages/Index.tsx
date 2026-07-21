@@ -736,6 +736,12 @@ const Index = () => {
               Share
             </Button>
             <div
+              className="flex items-center px-2.5 py-1.5 rounded-full text-xs font-mono border border-border bg-muted/40 text-muted-foreground"
+              title="App version"
+            >
+              v{UPDATES[0]?.version} <span className="ml-1 text-green-400">(current)</span>
+            </div>
+            <div
               className={cn(
                 "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border",
                 hasActive
