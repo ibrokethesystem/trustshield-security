@@ -72,6 +72,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          label: string | null
           parent_id: string
         }
         Insert: {
@@ -80,6 +81,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          label?: string | null
           parent_id: string
         }
         Update: {
@@ -88,7 +90,41 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          label?: string | null
           parent_id?: string
+        }
+        Relationships: []
+      }
+      permission_requests: {
+        Row: {
+          child_id: string
+          created_at: string
+          id: string
+          kind: string
+          note: string | null
+          parent_id: string
+          resolved_at: string | null
+          status: string
+        }
+        Insert: {
+          child_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          note?: string | null
+          parent_id: string
+          resolved_at?: string | null
+          status?: string
+        }
+        Update: {
+          child_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          parent_id?: string
+          resolved_at?: string | null
+          status?: string
         }
         Relationships: []
       }
@@ -318,6 +354,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_siblings: {
+        Args: { _child: string }
+        Returns: {
+          child_email: string
+          child_id: string
+          label: string
+        }[]
+      }
       is_parent_of: { Args: { _child: string }; Returns: boolean }
     }
     Enums: {
