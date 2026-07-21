@@ -14,6 +14,8 @@ const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [childOpen, setChildOpen] = useState(false);
+  const [parentEmail, setParentEmail] = useState("");
 
   useEffect(() => {
     document.title = mode === "signup" ? "Sign up · Trust Shield" : "Sign in · Trust Shield";
@@ -59,6 +61,25 @@ const Auth = () => {
     setBusy(true);
     const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
     if (result.error) {
+      toast.error("Google sign-in failed", { description: result.error.message });
+      setBusy(false);
+      return;
+    }
+    if (result.redirected) return;
+    navigate("/", { replace: true });
+  };
+
+  const handleChildGoogle = async () => {
+    const p = parentEmail.trim().toLowerCase();
+    if (!p || !p.includes("@")) {
+      toast.error("Enter the parent's email first");
+      return;
+    }
+    localStorage.setItem("ts_pending_child_signup", p);
+    setBusy(true);
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    if (result.error) {
+      localStorage.removeItem("ts_pending_child_signup");
       toast.error("Google sign-in failed", { description: result.error.message });
       setBusy(false);
       return;
@@ -154,7 +175,53 @@ const Auth = () => {
         <p className="text-center text-xs text-muted-foreground mt-6">
           Protected by Trust Shield · <Link to="/" className="hover:underline">Back home</Link>
         </p>
+
+        <div className="mt-3 text-center">
+          <button
+            type="button"
+            onClick={() => setChildOpen(true)}
+            className="text-xs text-primary hover:underline font-medium"
+          >
+            Have a child? Set up a monitored child account →
+          </button>
+        </div>
       </div>
+
+      {childOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-6">
+          <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold">Set up child account</h2>
+              <p className="text-xs text-muted-foreground mt-1">
+                Your child will sign in with their own Google account. Their alerts appear in your parent
+                Family tab, and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="parentEmail">Your (parent) email</Label>
+              <Input
+                id="parentEmail"
+                type="email"
+                value={parentEmail}
+                onChange={(e) => setParentEmail(e.target.value)}
+                placeholder="parent@example.com"
+                className="bg-secondary border-border"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Use the email you signed up to Trust Shield with — that's how their alerts reach you.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setChildOpen(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button className="flex-1 bg-gradient-shield glow-shield" onClick={handleChildGoogle} disabled={busy}>
+                {busy ? "Please wait…" : "Sign child in with Google"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
