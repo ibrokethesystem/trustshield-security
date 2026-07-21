@@ -3125,6 +3125,7 @@ function FamilyView({
   onRefresh,
   onClear,
   onAskGuardian,
+  onChildrenChange,
 }: {
   alerts: {
     id: string;
@@ -3139,6 +3140,7 @@ function FamilyView({
   onRefresh: () => void;
   onClear: () => void;
   onAskGuardian?: () => void;
+  onChildrenChange?: (count: number) => void;
 }) {
   const [children, setChildren] = useState<string[]>(() => {
     try {
