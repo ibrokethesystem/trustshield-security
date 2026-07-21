@@ -1,5 +1,10 @@
 // Trust Shield — background service worker
 // Intercepts top-frame navigations and warns before loading suspicious URLs.
+// Child edition: also reports activity to the linked parent's Trust Shield
+// account and enforces the parent's banned-sites list.
+
+const SUPABASE_URL = "https://ewuaaaidxngjnjjkxfjo.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3dWFhYWlkeG5nam5qamt4ZmpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDY4MDcsImV4cCI6MjA5OTc4MjgwN30.xOZdxZNd1wWsvIsyz0E5j5f1T_xVYg52u29eYeGH6a0";
 
 const SUSPICIOUS_TLDS = [
   "zip","mov","xyz","top","tk","ml","ga","cf","gq","click","country","kim","work","loan","review","science","party"
@@ -46,7 +51,9 @@ const DEFAULTS = {
   enabled: true,
   allowlist: [],        // hostnames user allowed
   blocklist: [],        // hostnames user explicitly blocked
-  stats: { scanned: 0, warned: 0 }
+  stats: { scanned: 0, warned: 0 },
+  ts_session: null,
+  ts_banned_hosts: [],
 };
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -54,7 +61,81 @@ chrome.runtime.onInstalled.addListener(async () => {
   const patch = {};
   for (const k of Object.keys(DEFAULTS)) if (cur[k] === undefined) patch[k] = DEFAULTS[k];
   if (Object.keys(patch).length) await chrome.storage.local.set(patch);
+  if (!cur.ts_session) chrome.runtime.openOptionsPage?.();
+  chrome.alarms.create("ts-sync-bans", { periodInMinutes: 1 });
 });
+
+chrome.runtime.onStartup?.addListener(() => {
+  chrome.alarms.create("ts-sync-bans", { periodInMinutes: 1 });
+});
+
+async function getSession() {
+  const { ts_session } = await chrome.storage.local.get("ts_session");
+  return ts_session || null;
+}
+async function clearSession() {
+  await chrome.storage.local.remove(["ts_session", "ts_banned_hosts"]);
+}
+async function refreshTokenIfNeeded() {
+  const s = await getSession();
+  if (!s?.refresh_token) return null;
+  if (s.expires_at && s.expires_at - Date.now() > 60_000) return s;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
+      body: JSON.stringify({ refresh_token: s.refresh_token }),
+    });
+    if (!res.ok) { await clearSession(); return null; }
+    const j = await res.json();
+    const next = {
+      ...s,
+      access_token: j.access_token,
+      refresh_token: j.refresh_token ?? s.refresh_token,
+      expires_at: (j.expires_at ?? (Math.floor(Date.now()/1000) + (j.expires_in ?? 3600))) * 1000,
+      user_id: j.user?.id ?? s.user_id,
+    };
+    await chrome.storage.local.set({ ts_session: next });
+    return next;
+  } catch { return null; }
+}
+async function pgFetch(path, opts = {}) {
+  const s = await refreshTokenIfNeeded();
+  if (!s?.access_token) return null;
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      ...(opts.headers || {}),
+      "apikey": SUPABASE_ANON,
+      "Authorization": `Bearer ${s.access_token}`,
+      "Content-Type": "application/json",
+    },
+  });
+}
+async function syncBannedHosts() {
+  const s = await refreshTokenIfNeeded();
+  if (!s?.user_id) return;
+  try {
+    const res = await pgFetch(`child_banned_sites?user_id=eq.${s.user_id}&select=host`);
+    if (!res || !res.ok) return;
+    const rows = await res.json();
+    const hosts = Array.isArray(rows) ? rows.map((r) => (r.host || "").toLowerCase()).filter(Boolean) : [];
+    await chrome.storage.local.set({ ts_banned_hosts: hosts });
+  } catch { /* offline */ }
+}
+async function logActivity(entry) {
+  const s = await refreshTokenIfNeeded();
+  if (!s?.user_id) return;
+  try {
+    await pgFetch("child_activity", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ ...entry, user_id: s.user_id }),
+    });
+  } catch { /* ignore */ }
+}
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === "ts-sync-bans") syncBannedHosts(); });
+syncBannedHosts();
 
 function levenshtein(a, b) {
   if (a === b) return 0;
@@ -128,7 +209,7 @@ function analyzeUrl(rawUrl) {
 }
 
 async function getState() {
-  return await chrome.storage.local.get(["enabled","allowlist","blocklist","stats"]);
+  return await chrome.storage.local.get(["enabled","allowlist","blocklist","stats","ts_banned_hosts"]);
 }
 
 function bumpStats(patch) {
@@ -157,7 +238,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   if ((state.allowlist || []).includes(host)) return;
 
-  const forceBlocked = (state.blocklist || []).includes(host);
+  const parentBanned = (state.ts_banned_hosts || []).some((h) => host === h || host.endsWith("." + h));
+  const forceBlocked = parentBanned || (state.blocklist || []).includes(host);
   const { risk, reasons } = analyzeUrl(url);
 
   // Blend in VirusTotal-backed website rating from Trust Shield's API.
@@ -172,14 +254,20 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
       totalReasons.unshift(`VirusTotal: ${rating.suspicious} security vendor(s) flagged this URL as suspicious.`);
     }
   }
+  if (parentBanned) totalReasons.unshift("A parent has banned this website.");
 
-  if (forceBlocked || totalRisk >= 30 || rating?.rating === "malicious") {
+  const willBlock = forceBlocked || totalRisk >= 30 || rating?.rating === "malicious";
+  // Report every top-frame navigation so parents see full browsing history.
+  logActivity({ host, url, risk: totalRisk, blocked: willBlock });
+
+  if (willBlock) {
     bumpStats({ warned: 1 });
     const warn = chrome.runtime.getURL("warning.html")
       + "?url=" + encodeURIComponent(url)
       + "&risk=" + totalRisk
       + "&reasons=" + encodeURIComponent(JSON.stringify(totalReasons))
       + "&blocked=" + (forceBlocked ? "1" : "0")
+      + "&parentBanned=" + (parentBanned ? "1" : "0")
       + "&rating=" + encodeURIComponent(rating?.rating || "unknown");
     chrome.tabs.update(details.tabId, { url: warn });
   }
@@ -187,7 +275,19 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
+    if (msg?.type === "ts-session-updated") {
+      syncBannedHosts();
+      sendResponse({ ok: true });
+      return;
+    }
     if (msg?.type === "allow-once" || msg?.type === "allow-always") {
+      if (msg.host) {
+        const { ts_banned_hosts = [] } = await chrome.storage.local.get("ts_banned_hosts");
+        if (ts_banned_hosts.some((h) => msg.host === h || msg.host.endsWith("." + h))) {
+          sendResponse({ ok: false, reason: "parent_banned" });
+          return;
+        }
+      }
       const { allowlist = [] } = await chrome.storage.local.get("allowlist");
       if (msg.type === "allow-always" && msg.host && !allowlist.includes(msg.host)) {
         allowlist.push(msg.host);
