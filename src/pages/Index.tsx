@@ -325,6 +325,7 @@ const Index = () => {
   const [view, setView] = useState<ViewKey>("dashboard");
   const [role, setRole] = useState<Role>("solo");
   const [parentEmail, setParentEmail] = useState<string>("");
+  const [eduDisabled, setEduDisabled] = useState<boolean>(false);
   const [familyAlerts, setFamilyAlerts] = useState<
     { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
   >([]);
