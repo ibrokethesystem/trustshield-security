@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { childEmailFor } from "@/lib/childAuth";
+import { childEmailFor, childLabelSlug } from "@/lib/childAuth";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -18,6 +18,7 @@ const Auth = () => {
   const [busy, setBusy] = useState(false);
   const [isChild, setIsChild] = useState(false);
   const [parentEmail, setParentEmail] = useState("");
+  const [childName, setChildName] = useState("");
 
   useEffect(() => {
     document.title = mode === "signup" ? "Sign up · Trust Shield" : "Sign in · Trust Shield";
@@ -43,11 +44,24 @@ const Auth = () => {
       if (isChild) {
         // Child sign-in only: the account was created by the parent from the dashboard.
         const pe = parentEmail.trim().toLowerCase();
-        const derived = await childEmailFor(pe);
-        const { error } = await supabase.auth.signInWithPassword({ email: derived, password });
-        if (error) {
+        const label = childLabelSlug(childName);
+        // Try the labelled email first (multi-child parents); fall back to
+        // the legacy no-label derivation so older single-child accounts
+        // created before names were required can still sign in.
+        const candidates = label
+          ? [await childEmailFor(pe, label)]
+          : [await childEmailFor(pe, ""), await childEmailFor(pe)];
+        let signedIn = false;
+        let lastErr: unknown = null;
+        for (const cand of candidates) {
+          const { error } = await supabase.auth.signInWithPassword({ email: cand, password });
+          if (!error) { signedIn = true; break; }
+          lastErr = error;
+        }
+        if (!signedIn) {
+          void lastErr;
           throw new Error(
-            "That parent email + password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
+            "That parent email, child name, and password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
           );
         }
         // If the parent soft-deleted this child (recycle bin), block sign-in.
