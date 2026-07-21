@@ -2210,7 +2210,6 @@ function ExtensionsView({
 
   return (
     <div className="space-y-4">
-      <ChildMonitoring parentUserId={parentUserId} />
       <Card>
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
