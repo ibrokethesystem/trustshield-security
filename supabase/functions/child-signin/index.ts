@@ -19,27 +19,11 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Look up parent's child_links (bypasses RLS via service_role)
-    const { data: parentRow } = await admin
-      .from('_users_lookup_dummy' as never)
-      .select('id')
-      .limit(0);
-    void parentRow;
-
-    // Fetch parent's user id from auth.users via admin API by iterating pages is
-    // expensive; instead use rpc to filter by lower(email). We use a raw SQL
-    // call via the service role client.
-    const { data: parents } = await admin
-      .schema('auth' as never)
-      .from('users' as never)
-      .select('id, email')
-      .ilike('email', parent_email)
-      .limit(1) as unknown as { data: { id: string; email: string }[] | null };
-
-    if (!parents || parents.length === 0) {
-      return json({ error: 'invalid_credentials' }, 401);
-    }
-    const parentId = parents[0].id;
+    // Resolve parent user id via a service-role-only helper RPC.
+    const { data: parentId } = await admin.rpc('find_parent_id_by_email', {
+      _email: parent_email,
+    }) as unknown as { data: string | null };
+    if (!parentId) return json({ error: 'invalid_credentials' }, 401);
 
     const { data: links } = await admin
       .from('child_links')
