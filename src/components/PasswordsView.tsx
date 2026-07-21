@@ -111,6 +111,89 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// ===== Client-side vault encryption (AES-GCM, key derived from PIN) =====
+// Vault entry fields (password / username / notes) are encrypted in the
+// browser before they reach the database, so the stored values are
+// ciphertext at rest. Only a user who knows the vault unlock code can
+// derive the key and read them.
+
+const ENC_PREFIX = "enc:v1:";
+
+function bytesToB64(bytes: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64ToBytes(b64: string): Uint8Array {
+  const s = atob(b64);
+  const out = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+  return out;
+}
+function hexToBytes(hex: string): Uint8Array {
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+  return out;
+}
+
+async function deriveVaultKey(pin: string, saltHex: string): Promise<CryptoKey> {
+  const salt = hexToBytes(saltHex);
+  const baseKey = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(pin), { name: "PBKDF2" }, false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 200_000, hash: "SHA-256" },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+async function encryptField(key: CryptoKey, plain: string): Promise<string> {
+  if (!plain) return "";
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv }, key, new TextEncoder().encode(plain),
+  ));
+  return `${ENC_PREFIX}${bytesToB64(iv)}:${bytesToB64(ct)}`;
+}
+
+async function decryptField(key: CryptoKey, value: string): Promise<string> {
+  if (!value || !value.startsWith(ENC_PREFIX)) return value ?? "";
+  const rest = value.slice(ENC_PREFIX.length);
+  const [ivB64, ctB64] = rest.split(":");
+  if (!ivB64 || !ctB64) return "";
+  try {
+    const iv = b64ToBytes(ivB64);
+    const ct = b64ToBytes(ctB64);
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+    return new TextDecoder().decode(pt);
+  } catch {
+    return "";
+  }
+}
+
+async function encryptEntryFields(
+  key: CryptoKey,
+  fields: { password: string; username: string; notes: string },
+) {
+  return {
+    password: await encryptField(key, fields.password),
+    username: fields.username ? await encryptField(key, fields.username) : "",
+    notes: fields.notes ? await encryptField(key, fields.notes) : "",
+  };
+}
+
+async function decryptEntry(key: CryptoKey, e: VaultEntry): Promise<VaultEntry> {
+  return {
+    ...e,
+    password: await decryptField(key, e.password),
+    username: await decryptField(key, e.username),
+    notes: await decryptField(key, e.notes),
+  };
+}
+
 const WEBAUTHN_LOCAL_KEY = (uid: string) => `trust-shield:webauthn:${uid}`;
 
 function isWebAuthnSupported() {
@@ -206,6 +289,9 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
   const [unlockPin, setUnlockPin] = useState("");
   const [fingerprintReady, setFingerprintReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Derived AES-GCM key from the PIN. Kept in memory only. When set, new
+  // writes are encrypted before being sent to the database.
+  const [derivedKey, setDerivedKey] = useState<CryptoKey | null>(null);
 
   // Setup form
   const [setupOpen, setSetupOpen] = useState(false);
@@ -315,14 +401,22 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       // inserted row).
       const id = crypto.randomUUID();
       const now = new Date().toISOString();
+      const plainFields = {
+        password: form.password,
+        username: form.username.trim(),
+        notes: form.notes.trim(),
+      };
+      const stored = derivedKey
+        ? await encryptEntryFields(derivedKey, plainFields)
+        : plainFields;
       const { error } = await supabase
         .from("vault_entries")
-        .insert({ id, user_id: userId, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim() } as any);
+        .insert({ id, user_id: userId, label: form.label.trim(), ...stored } as any);
       if (error) { toast.error("Couldn't save", { description: error.message }); return; }
-      const entry: VaultEntry = { id, label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), url: "", updated_at: now };
+      const entry: VaultEntry = { id, label: form.label.trim(), ...plainFields, url: "", updated_at: now };
       const next = [entry, ...entries];
       setEntries(next); updateSummary(next);
-      toast.success("Saved and synced to your account");
+      toast.success(derivedKey ? "Saved (encrypted) and synced" : "Saved and synced to your account");
     } else {
       const entry: VaultEntry = { id: crypto.randomUUID(), label: form.label.trim(), username: form.username.trim(), password: form.password, notes: form.notes.trim(), url: "", updated_at: new Date().toISOString() };
       const next = [entry, ...entries];
@@ -412,11 +506,22 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
       const hash = await sha256Hex(saltHex + ":" + newPin);
+      // Derive the vault encryption key from the new PIN and re-encrypt every
+      // existing entry so cleartext values never remain in the database.
+      const key = await deriveVaultKey(newPin, saltHex);
+      for (const e of entries) {
+        const enc = await encryptEntryFields(key, {
+          password: e.password, username: e.username, notes: e.notes,
+        });
+        await supabase.from("vault_entries")
+          .update(enc as any).eq("id", e.id).eq("user_id", userId);
+      }
       const { error } = await supabase.from("vault_settings").upsert({
         user_id: userId, lock_enabled: true, pin_hash: hash, pin_salt: saltHex,
       });
       if (error) throw error;
       setLockEnabled(true); setPinHash(hash); setPinSalt(saltHex); setUnlocked(true);
+      setDerivedKey(key);
 
       if (enrollFinger) {
         try {
@@ -440,12 +545,20 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
     if (!userId) return;
     setBusy(true);
     try {
+      // Decrypt every entry back to plaintext before removing the lock, so
+      // the vault keeps working (and stays readable) after the PIN is gone.
+      for (const e of entries) {
+        await supabase.from("vault_entries")
+          .update({ password: e.password, username: e.username, notes: e.notes } as any)
+          .eq("id", e.id).eq("user_id", userId);
+      }
       const { error } = await supabase.from("vault_settings").upsert({
         user_id: userId, lock_enabled: false, pin_hash: null, pin_salt: null,
       });
       if (error) throw error;
       try { localStorage.removeItem(WEBAUTHN_LOCAL_KEY(userId)); } catch {}
       setLockEnabled(false); setPinHash(null); setPinSalt(null); setUnlocked(true); setFingerprintReady(false);
+      setDerivedKey(null);
       toast.success("Vault lock removed");
     } catch (e) {
       toast.error("Couldn't disable lock", { description: e instanceof Error ? e.message : "" });
@@ -463,11 +576,20 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       const salt = crypto.getRandomValues(new Uint8Array(16));
       const saltHex = Array.from(salt).map((b) => b.toString(16).padStart(2, "0")).join("");
       const hash = await sha256Hex(saltHex + ":" + changePin);
+      // Re-encrypt every entry with the key derived from the new PIN.
+      const newKey = await deriveVaultKey(changePin, saltHex);
+      for (const e of entries) {
+        const enc = await encryptEntryFields(newKey, {
+          password: e.password, username: e.username, notes: e.notes,
+        });
+        await supabase.from("vault_entries")
+          .update(enc as any).eq("id", e.id).eq("user_id", userId);
+      }
       const { error } = await supabase.from("vault_settings").upsert({
         user_id: userId, lock_enabled: true, pin_hash: hash, pin_salt: saltHex,
       });
       if (error) throw error;
-      setPinHash(hash); setPinSalt(saltHex);
+      setPinHash(hash); setPinSalt(saltHex); setDerivedKey(newKey);
       setChangeOpen(false); setCurrentPin(""); setChangePin(""); setChangePin2("");
       toast.success("Lock password changed");
     } catch (e) {
@@ -497,9 +619,19 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
         return;
       }
       const rows = ((data as { entries?: unknown[] }).entries ?? []) as any[];
-      const list: VaultEntry[] = rows.map((r) => ({
+      let list: VaultEntry[] = rows.map((r) => ({
         id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
       }));
+      // Derive the decryption key from the PIN and unwrap any encrypted
+      // fields client-side. Legacy plaintext entries pass through untouched.
+      let key: CryptoKey | null = null;
+      if (pinSalt) {
+        try {
+          key = await deriveVaultKey(unlockPin, pinSalt);
+          list = await Promise.all(list.map((e) => decryptEntry(key!, e)));
+        } catch {}
+      }
+      setDerivedKey(key);
       setEntries(list);
       updateSummary(list);
       setUnlocked(true);
