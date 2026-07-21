@@ -2,9 +2,22 @@
 const SUPABASE_URL = "https://ewuaaaidxngjnjjkxfjo.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3dWFhYWlkeG5nam5qamt4ZmpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDY4MDcsImV4cCI6MjA5OTc4MjgwN30.xOZdxZNd1wWsvIsyz0E5j5f1T_xVYg52u29eYeGH6a0";
 
-async function childEmailFor(parentEmail) {
-  const norm = parentEmail.trim().toLowerCase();
-  const bytes = new TextEncoder().encode(`trustshield-child:${norm}`);
+function childLabelSlug(label) {
+  return (label || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32);
+}
+
+async function childEmailFor(parentEmail, label = "") {
+  const parentNorm = parentEmail.trim().toLowerCase();
+  const labelNorm = childLabelSlug(label);
+  const seed = labelNorm
+    ? `trustshield-child:${parentNorm}::${labelNorm}`
+    : `trustshield-child:${parentNorm}`;
+  const bytes = new TextEncoder().encode(seed);
   const hashBuf = await crypto.subtle.digest("SHA-256", bytes);
   const hex = Array.from(new Uint8Array(hashBuf)).slice(0, 8)
     .map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -30,18 +43,37 @@ async function refreshView() {
 
 document.getElementById("pair").addEventListener("click", async () => {
   const pEmail = document.getElementById("pemail").value.trim().toLowerCase();
+  const cName = document.getElementById("cname")?.value || "";
   const pPass = document.getElementById("ppass").value;
   if (!pEmail || !pPass) { setStatus("Enter both fields.", "err"); return; }
   setStatus("Signing in…", "muted");
   try {
-    const cEmail = await childEmailFor(pEmail);
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    // Try derivation WITH the provided name first, then fall back to the
+    // legacy no-name derivation for accounts made before multi-child support.
+    const emailsToTry = [];
+    if (cName.trim()) emailsToTry.push(await childEmailFor(pEmail, cName));
+    emailsToTry.push(await childEmailFor(pEmail, ""));
+
+    let res, j, cEmail;
+    for (const candidate of emailsToTry) {
+      cEmail = candidate;
+      res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON },
-      body: JSON.stringify({ email: cEmail, password: pPass }),
-    });
-    const j = await res.json();
-    if (!res.ok) throw new Error(j.error_description || j.msg || j.error || "Sign-in failed");
+        body: JSON.stringify({ email: cEmail, password: pPass }),
+      });
+      j = await res.json();
+      if (res.ok) break;
+    }
+    if (!res.ok) {
+      const detail = j?.error_description || j?.msg || j?.error || "Sign-in failed";
+      // Make the common case (wrong name) obvious.
+      throw new Error(
+        /invalid/i.test(detail)
+          ? "Wrong parent email, name, or password. Ask your parent which name they set."
+          : detail
+      );
+    }
     await chrome.storage.local.set({
       ts_session: {
         access_token: j.access_token,
