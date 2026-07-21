@@ -1,4 +1,8 @@
-// Public: no JWT required. CORS wide-open so the Chrome extension can call it.
+// Requires a valid Trust Shield user session. The browser extensions attach
+// the signed-in user's access token when calling this endpoint so anonymous
+// callers can't drain the paid VirusTotal quota.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,6 +18,26 @@ function b64url(input: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    // Authenticate the caller. Without this, anyone on the internet can burn
+    // through the project's paid VirusTotal quota.
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } },
+    );
+    const { data: claims, error: authErr } = await supabase.auth.getClaims(token);
+    if (authErr || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if (!VT_KEY) throw new Error('VIRUSTOTAL_API_KEY not configured');
     let url = '';
     if (req.method === 'GET') url = new URL(req.url).searchParams.get('url') ?? '';
