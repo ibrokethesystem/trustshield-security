@@ -43,34 +43,35 @@ const Auth = () => {
       if (isChild) {
         // Child sign-in only: the account was created by the parent from the dashboard.
         const pe = parentEmail.trim().toLowerCase();
-        // Ask the server for all child_email values linked to this parent
-        // (multi-child, arbitrary labels), then fall back to derivation-based
-        // guesses for legacy single-child accounts.
-        const candidates: string[] = [];
-        try {
-          const { data: rows } = await supabase.rpc("list_child_emails_for_parent", {
-            _parent_email: pe,
-          });
-          if (Array.isArray(rows)) {
-            for (const r of rows) {
-              const em = (r as { child_email?: string }).child_email;
-              if (em && !candidates.includes(em)) candidates.push(em);
-            }
-          }
-        } catch {
-          // ignore; fall through to derivation guesses
-        }
-        candidates.push(await childEmailFor(pe, ""));
-        candidates.push(await childEmailFor(pe));
+        // Ask the server to authenticate — the server looks up linked children
+        // internally so children's emails never leave the backend.
         let signedIn = false;
-        let lastErr: unknown = null;
-        for (const cand of candidates) {
-          const { error } = await supabase.auth.signInWithPassword({ email: cand, password });
-          if (!error) { signedIn = true; break; }
-          lastErr = error;
+        try {
+          const { data, error } = await supabase.functions.invoke("child-signin", {
+            body: { parent_email: pe, password },
+          });
+          if (!error && data?.access_token && data?.refresh_token) {
+            const { error: setErr } = await supabase.auth.setSession({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+            });
+            if (!setErr) signedIn = true;
+          }
+        } catch { /* fall through to legacy derivations */ }
+
+        // Legacy fallback: try the derivation-based emails for accounts created
+        // before the server-side flow existed. These are still valid Supabase
+        // credentials for the child auth user.
+        if (!signedIn) {
+          const candidates: string[] = [];
+          candidates.push(await childEmailFor(pe, ""));
+          candidates.push(await childEmailFor(pe));
+          for (const cand of candidates) {
+            const { error } = await supabase.auth.signInWithPassword({ email: cand, password });
+            if (!error) { signedIn = true; break; }
+          }
         }
         if (!signedIn) {
-          void lastErr;
           throw new Error(
             "That parent email and password combination didn't match. Ask your parent to set up your account from their Trust Shield dashboard (Set up child account)."
           );
