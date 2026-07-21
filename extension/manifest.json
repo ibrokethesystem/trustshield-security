@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Trust Shield — Scam & Hack Detector",
-  "version": "1.1.0",
-  "description": "Warns you before you load a dangerous or suspicious URL.",
+  "name": "Trust Shield Extension 2.0",
+  "version": "2.0.0",
+  "description": "Warns you before you load a dangerous or suspicious URL, and flags fake login pages.",
   "permissions": ["webNavigation", "tabs", "storage", "notifications"],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["autofill.js"],
+      "js": ["autofill.js", "fake-login-detector.js"],
       "run_at": "document_idle",
       "all_frames": false
     }
