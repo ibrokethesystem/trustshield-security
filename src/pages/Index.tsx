@@ -1127,7 +1127,7 @@ const Index = () => {
                 </Button>
               </div>
             </Card>
-            <ThreatRadarView userId={user?.id} />
+            {showThreatRadar && <ThreatRadarView userId={user?.id} />}
             </div>
 
             {/* Threats list */}
