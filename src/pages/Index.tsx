@@ -46,6 +46,7 @@ import CyberEduView from "@/components/CyberEduView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
