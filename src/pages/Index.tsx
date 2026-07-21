@@ -2128,29 +2128,34 @@ type DiscoveredDevice = {
   note?: string;
 };
 
-async function getLocalIps(timeoutMs = 1500): Promise<string[]> {
+async function getLocalIps(timeoutMs = 2000): Promise<{ ips: string[]; mdns: string[] }> {
   return new Promise((resolve) => {
     const ips = new Set<string>();
+    const mdns = new Set<string>();
     let pc: RTCPeerConnection | null = null;
     try {
       pc = new RTCPeerConnection({ iceServers: [] });
     } catch {
-      resolve([]);
+      resolve({ ips: [], mdns: [] });
       return;
     }
     const done = () => {
       try { pc?.close(); } catch { /* ignore */ }
-      resolve(Array.from(ips));
+      resolve({ ips: Array.from(ips), mdns: Array.from(mdns) });
     };
     const timer = setTimeout(done, timeoutMs);
     pc.onicecandidate = (e) => {
       if (!e.candidate) { clearTimeout(timer); done(); return; }
       const parts = e.candidate.candidate.split(" ");
-      const ip = parts[4];
-      if (ip && /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) && !ip.startsWith("0.")) ips.add(ip);
+      const addr = parts[4];
+      if (!addr) return;
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(addr) && !addr.startsWith("0.")) ips.add(addr);
+      else if (/\.local$/i.test(addr)) mdns.add(addr);
     };
-    pc.createDataChannel("d");
-    pc.createOffer().then((o) => pc?.setLocalDescription(o)).catch(() => { clearTimeout(timer); done(); });
+    try { pc.createDataChannel("d"); } catch { /* ignore */ }
+    pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true } as RTCOfferOptions)
+      .then((o) => pc?.setLocalDescription(o))
+      .catch(() => { clearTimeout(timer); done(); });
   });
 }
 
@@ -2181,23 +2186,25 @@ function DeviceScanner() {
     setError(null);
     setDevices(null);
     try {
-      const ips = await getLocalIps();
+      const { ips, mdns } = await getLocalIps();
       const localIp = ips.find((i) =>
         /^10\./.test(i) || /^192\.168\./.test(i) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(i),
       ) || ips[0];
 
-      if (!localIp) {
-        setError(
-          "Your browser blocked local network discovery (mDNS obfuscation or private-IP protection). Everything else on this page still works.",
-        );
-        return;
-      }
-
-      const sub = subnetFrom(localIp);
+      const sub = localIp ? subnetFrom(localIp) : "192.168.1";
       setSubnet(sub);
 
+      const thisIpDisplay = localIp
+        ? localIp
+        : mdns[0]
+        ? `${mdns[0]} (hidden by browser)`
+        : "Hidden by browser";
+      const thisNote = localIp
+        ? undefined
+        : "Your browser masks the exact local IP for privacy (mDNS). The subnet below is the most common default.";
+
       const list: DiscoveredDevice[] = [
-        { ip: localIp, label: `${describeThisDevice()} (you)`, role: "this", note: navigator.userAgent.split(") ")[0].split("(")[1] || undefined },
+        { ip: thisIpDisplay, label: `${describeThisDevice()} (you)`, role: "this", note: thisNote },
       ];
 
       if (sub) {
