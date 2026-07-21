@@ -2095,6 +2095,8 @@ function NetworkScanView() {
         </Card>
       )}
 
+      <DeviceScanner />
+
       <Card>
         <h4 className="font-semibold text-sm mb-2">What this can't check</h4>
         <p className="text-xs text-muted-foreground leading-relaxed">
