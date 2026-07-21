@@ -833,6 +833,7 @@ const Index = () => {
               </div>
             </PopoverContent>
           </Popover>
+          )}
         </div>
       </aside>
 
