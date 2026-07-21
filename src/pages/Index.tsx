@@ -791,6 +791,17 @@ const Index = () => {
     // Redirect handles the rest.
   };
 
+  const startChildEmailSignup = async () => {
+    if (!user?.email) {
+      toast.error("Sign in first");
+      return;
+    }
+    setChildBusy(true);
+    localStorage.setItem("ts_pending_child_signup", user.email.toLowerCase());
+    await supabase.auth.signOut();
+    navigate("/auth", { replace: true });
+  };
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
