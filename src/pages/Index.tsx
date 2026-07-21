@@ -71,6 +71,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "1.9.8",
+    version: "1.9.8",
+    name: "Guardian knows the changelog",
+    date: "2026-07-21",
+    summary:
+      "Cyber Guardian now knows Trust Shield's current version and every past release note, so you can ask it what changed in any update.",
+  },
+  {
     id: "1.9.7",
     version: "1.9.7",
     name: "New shield logo",
