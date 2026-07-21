@@ -3974,7 +3974,12 @@ function FamilyView({
                       className="h-6 px-2"
                       onClick={() => {
                         setRenameOpen(c);
-                        setRenameValue((childLabels[c.toLowerCase()] ?? "").replace(/-/g, " "));
+                        {
+                          const raw = childLabels[c.toLowerCase()] ?? "";
+                          setRenameValue(
+                            !/\s/.test(raw) && !/[A-Z]/.test(raw) ? raw.replace(/-/g, " ") : raw,
+                          );
+                        }
                       }}
                     >
                       <Pencil className="w-3 h-3 mr-1" />
