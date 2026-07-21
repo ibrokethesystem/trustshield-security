@@ -552,6 +552,12 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
         {step === "read" && (
           <>
             <p className="text-sm">{lesson.intro}</p>
+            {lesson.story && (
+              <p className="text-sm text-muted-foreground mt-3 leading-relaxed whitespace-pre-line">
+                {lesson.story}
+              </p>
+            )}
+            <div className="mt-3 text-xs font-semibold uppercase tracking-wide text-primary">Key points</div>
             <ul className="mt-3 space-y-2">
               {lesson.points.map((p, i) => (
                 <li key={i} className="text-sm flex gap-2">
@@ -560,6 +566,29 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
                 </li>
               ))}
             </ul>
+            {lesson.sections?.map((s, i) => (
+              <div key={i} className="mt-4 p-3 rounded-lg bg-secondary/40 border border-border">
+                <div className="text-sm font-semibold mb-2">{s.heading}</div>
+                <ul className="space-y-1.5">
+                  {s.body.map((b, j) => (
+                    <li key={j} className="text-sm flex gap-2">
+                      <span className="text-primary shrink-0">›</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            {lesson.tryThis && lesson.tryThis.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                <div className="text-sm font-semibold mb-1">🎯 Try this at home</div>
+                <ul className="space-y-1">
+                  {lesson.tryThis.map((t, i) => (
+                    <li key={i} className="text-sm">{t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Close</Button>
               <Button onClick={() => setStep("quiz")}>
