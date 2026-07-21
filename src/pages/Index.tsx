@@ -1532,6 +1532,10 @@ const Index = () => {
               setFamilyAlerts([]);
               toast.success("Family inbox cleared");
             }}
+            onAskGuardian={() => {
+              setGuardianPrefill("How can I set up a child extension?");
+              setView("guardian");
+            }}
           />
         ) : (
           <GuardianView
