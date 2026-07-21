@@ -72,6 +72,14 @@
       <button class="ghost" id="askPerm">🙋 Ask for permission</button>
       <button class="ghost" id="allowOnce">Only continue with an adult</button>
     </div>
+    <div id="reasonWrap" style="display:none;margin-top:16px;text-align:left;">
+      <label for="reason" style="display:block;font-weight:700;color:#fff;margin-bottom:6px;">Tell your parent why you want to visit this site</label>
+      <textarea id="reason" rows="3" placeholder="e.g. It's for a school project about..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(239,68,68,.4);background:#1a0000;color:#fff;font-family:inherit;font-size:14px;resize:vertical;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;justify-content:flex-end;">
+        <button class="ghost" id="cancelReason">Cancel</button>
+        <button class="primary" id="sendReason">Send request to parent</button>
+      </div>
+    </div>
     <div id="askStatus" style="margin-top:16px;font-size:14px;color:#fca5a5;"></div>
     <div class="foot">Trust Shield • Child Edition — always ask a grown-up</div>
   </div>
