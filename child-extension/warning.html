@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Unsafe Website — Trust Shield</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; min-height: 100vh; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(circle at 20% 10%, #3b0d0d 0%, #0b0000 60%);
+      color: #fff5f5; display: flex; align-items: center; justify-content: center; padding: 32px;
+    }
+    .card {
+      max-width: 900px; width: 100%;
+      background: rgba(20,0,0,.85);
+      border: 2px solid rgba(239,68,68,.7);
+      border-radius: 24px;
+      padding: 48px;
+      box-shadow: 0 40px 120px rgba(239,68,68,.35), 0 0 0 6px rgba(239,68,68,.15);
+      text-align: center;
+    }
+    .icon { font-size: 88px; line-height: 1; margin-bottom: 12px; }
+    h1 {
+      font-size: clamp(40px, 6vw, 72px);
+      margin: 8px 0 4px;
+      font-weight: 900;
+      letter-spacing: -.02em;
+      color: #ffffff;
+      text-shadow: 0 4px 30px rgba(239,68,68,.5);
+    }
+    .from { font-size: 20px; color: #fca5a5; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 24px; }
+    p.sub { color:#fecaca; margin: 0 auto 24px; font-size: 17px; max-width: 640px; }
+    .url {
+      background: #1a0000; border:1px solid rgba(239,68,68,.4);
+      padding: 14px 16px; border-radius: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px; word-break: break-all; color:#fff; text-align:left;
+    }
+    .risk { display:flex; align-items:center; gap:12px; margin: 20px 0 8px; }
+    .bar { flex:1; height: 10px; background:#2a0000; border-radius:999px; overflow:hidden; }
+    .fill { height:100%; background: linear-gradient(90deg,#f59e0b,#ef4444); }
+    .section-title { text-align:left; font-weight:700; margin-top: 16px; color:#fff; }
+    ul { margin: 10px 0 28px; padding-left: 22px; color:#fecaca; text-align:left; }
+    li { margin: 6px 0; }
+    .btns { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+    button {
+      cursor:pointer; padding: 14px 22px; border-radius: 12px; font-weight:700; font-size:15px;
+      border: 1px solid transparent;
+    }
+    .primary { background:#ef4444; color:white; }
+    .primary:hover { background:#dc2626; }
+    .ghost { background: transparent; color:#fecaca; border-color: rgba(239,68,68,.4); }
+    .ghost:hover { background: rgba(239,68,68,.12); }
+    .foot { margin-top: 24px; font-size:12px; color:#9ca3af; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">⚠️</div>
+    <h1>Unsafe Website</h1>
+    <div class="from">From Trust Shield</div>
+    <p class="sub">Trust Shield blocked this page because it matches patterns commonly used in scams, phishing, or malware.</p>
+    <div class="url" id="url">—</div>
+    <div class="risk"><span>Risk</span><div class="bar"><div class="fill" id="fill" style="width:0%"></div></div><strong id="riskNum">0</strong></div>
+    <div class="section-title">Why it was flagged</div>
+    <ul id="reasons"></ul>
+    <div class="btns">
+      <button class="primary" id="back">← Go back to safety</button>
+      <button class="ghost" id="allowOnce">Continue anyway</button>
+    </div>
+    <div class="foot">Trust Shield • Protecting your browsing</div>
+  </div>
+  <script src="warning.js"></script>
+</body>
+</html>
