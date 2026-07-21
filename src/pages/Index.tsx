@@ -3629,29 +3629,35 @@ function FamilyView({
   const [deletedChildren, setDeletedChildren] = useState<{ child_id: string; child_email: string; deleted_at: string }[]>([]);
   const [confirmPurge, setConfirmPurge] = useState<string | null>(null);
   const [childLabels, setChildLabels] = useState<Record<string, string>>({});
+  const [childInfoById, setChildInfoById] = useState<Record<string, { email: string; label: string | null }>>({});
+  const [renameOpen, setRenameOpen] = useState<string | null>(null); // child email being renamed
+  const [renameValue, setRenameValue] = useState("");
   const [pendingRequests, setPendingRequests] = useState<
-    { id: string; kind: string; status: string; created_at: string; child_id: string }[]
+    { id: string; kind: string; status: string; created_at: string; child_id: string; note: string | null }[]
   >([]);
 
   const loadLabels = useCallback(async () => {
     if (!parentUserId) return;
     const { data } = await supabase
       .from("child_links")
-      .select("child_email, label")
+      .select("child_id, child_email, label")
       .eq("parent_id", parentUserId)
       .is("deleted_at", null);
     const map: Record<string, string> = {};
+    const byId: Record<string, { email: string; label: string | null }> = {};
     (data ?? []).forEach((r) => {
       if (r.child_email && r.label) map[r.child_email.toLowerCase()] = r.label;
+      if (r.child_id) byId[r.child_id] = { email: (r.child_email ?? "").toLowerCase(), label: r.label ?? null };
     });
     setChildLabels(map);
+    setChildInfoById(byId);
   }, [parentUserId]);
 
   const loadRequests = useCallback(async () => {
     if (!parentUserId) return;
     const { data } = await supabase
       .from("permission_requests")
-      .select("id, kind, status, created_at, child_id")
+      .select("id, kind, status, created_at, child_id, note")
       .eq("parent_id", parentUserId)
       .eq("status", "pending")
       .order("created_at", { ascending: false });
@@ -3660,7 +3666,25 @@ function FamilyView({
 
   useEffect(() => { void loadLabels(); void loadRequests(); }, [loadLabels, loadRequests]);
 
-  const decideRequest = async (id: string, approve: boolean) => {
+  const decideRequest = async (
+    id: string,
+    approve: boolean,
+    extra?: { kind: string; child_id: string; note: string | null },
+  ) => {
+    // Side effect: for approved unblock_site, remove the row from child_banned_sites
+    // so the child's extension stops blocking it on next sync.
+    if (approve && extra?.kind === "unblock_site" && extra.note && extra.child_id) {
+      const host = extra.note.trim().toLowerCase();
+      const { error: delErr } = await supabase
+        .from("child_banned_sites")
+        .delete()
+        .eq("user_id", extra.child_id)
+        .eq("host", host);
+      if (delErr) {
+        toast.error("Couldn't unban the site", { description: delErr.message });
+        return;
+      }
+    }
     const { error } = await supabase
       .from("permission_requests")
       .update({ status: approve ? "approved" : "denied", resolved_at: new Date().toISOString() })
@@ -3671,6 +3695,41 @@ function FamilyView({
     }
     toast.success(approve ? "Request approved" : "Request denied");
     await loadRequests();
+  };
+
+  const submitRename = async () => {
+    const email = renameOpen;
+    if (!email || !parentUserId) return;
+    const label = childLabelSlug(renameValue);
+    if (!label) {
+      toast.error("Name needs at least one letter or number");
+      return;
+    }
+    // Prevent duplicate labels for this parent
+    const { data: existing } = await supabase
+      .from("child_links")
+      .select("label, child_email")
+      .eq("parent_id", parentUserId)
+      .is("deleted_at", null);
+    if ((existing ?? []).some(
+      (r) => (r.label ?? "").toLowerCase() === label && (r.child_email ?? "").toLowerCase() !== email.toLowerCase(),
+    )) {
+      toast.error("You already have another child with that name");
+      return;
+    }
+    const { error } = await supabase
+      .from("child_links")
+      .update({ label })
+      .eq("parent_id", parentUserId)
+      .ilike("child_email", email);
+    if (error) {
+      toast.error("Couldn't rename", { description: error.message });
+      return;
+    }
+    toast.success("Name updated");
+    setRenameOpen(null);
+    setRenameValue("");
+    await loadLabels();
   };
 
   const displayName = (email: string) => {
