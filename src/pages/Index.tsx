@@ -74,10 +74,10 @@ const UPDATES: UpdateNote[] = [
   {
     id: "2.0.0",
     version: "2.0.0",
-    name: "QR code scanner (mobile)",
+    name: "QR scanner + Trust Shield Extension 2.0",
     date: "2026-07-21",
     summary:
-      "Added a QR code scanner tab. On mobile, Trust Shield uses your camera to scan QR codes and warn you before opening malicious links. Desktop shows a notice that the scanner is mobile-only.",
+      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains).",
   },
   {
     id: "1.9.9",
