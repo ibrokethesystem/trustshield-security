@@ -75,10 +75,10 @@ const UPDATES: UpdateNote[] = [
   {
     id: "2.0.0",
     version: "2.0.0",
-    name: "QR scanner + Trust Shield Extension 2.0",
+    name: "QR scanner, Family Mode & Trust Shield Extension 2.0",
     date: "2026-07-21",
     summary:
-      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains). Version switcher now truly reverts the UI to older releases — features added after the selected version hide themselves, and \"Return to current\" restores everything.",
+      "Added a QR code scanner tab (mobile) that uses your camera to warn about malicious links. Renamed the Chrome and Edge extensions to Trust Shield Extension 2.0 and added on-page fake login page detection — the extensions now warn you when a sign-in form looks like phishing (HTTP logins, brand-name spoofing, cross-origin form submits, punycode/lookalike domains). Version switcher now truly reverts the UI to older releases — features added after the selected version hide themselves, and \"Return to current\" restores everything. Family Mode: \"Set up child account\" now creates the child's account directly from the parent's dashboard with a password you choose (no Google needed), and the Create account page has a \"Child\" button so a child can self-register and link to their parent's email.",
   },
   {
     id: "1.9.9",
@@ -284,6 +284,9 @@ const Index = () => {
   >([]);
   const [childDialogOpen, setChildDialogOpen] = useState(false);
   const [childBusy, setChildBusy] = useState(false);
+  const [childEmail, setChildEmail] = useState("");
+  const [childPassword, setChildPassword] = useState("");
+  const [childPasswordConfirm, setChildPasswordConfirm] = useState("");
   const [guardianPrefill, setGuardianPrefill] = useState<string>("");
   const [history, setHistory] = useState<ScanRecord[] | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -484,6 +487,13 @@ const Index = () => {
       const email = user.email ?? "";
       if (email && !existing.includes(email)) existing.push(email);
       localStorage.setItem(idxKey, JSON.stringify(existing));
+    }
+    // If this user was created as a child (via "Set up child account"), user_metadata carries
+    // parent_email + role=child. Recognize that on any device on first sign-in.
+    const meta = (user.user_metadata ?? {}) as { role?: string; parent_email?: string };
+    if (!localStorage.getItem(roleKey) && meta.role === "child" && meta.parent_email) {
+      localStorage.setItem(roleKey, "child");
+      localStorage.setItem(parentKey, meta.parent_email);
     }
     const storedRole = (localStorage.getItem(roleKey) as Role | null) ?? null;
     const myEmail = (user.email ?? "").toLowerCase();
@@ -791,15 +801,83 @@ const Index = () => {
     // Redirect handles the rest.
   };
 
-  const startChildEmailSignup = async () => {
+  const createChildAccount = async () => {
     if (!user?.email) {
       toast.error("Sign in first");
       return;
     }
+    const email = childEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Enter a valid email for the child account");
+      return;
+    }
+    if (childPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (childPassword !== childPasswordConfirm) {
+      toast.error("Passwords don't match");
+      return;
+    }
     setChildBusy(true);
-    localStorage.setItem("ts_pending_child_signup", user.email.toLowerCase());
-    await supabase.auth.signOut();
-    navigate("/auth", { replace: true });
+    // Save parent session so we can restore it after Supabase auto-signs-in the new child.
+    const { data: parentSessionData } = await supabase.auth.getSession();
+    const parentSession = parentSessionData.session;
+    const parentEmailLower = user.email.toLowerCase();
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: childPassword,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { role: "child", parent_email: parentEmailLower },
+        },
+      });
+      if (error) throw error;
+      // Restore the parent's session immediately (auto-confirm signs the child in).
+      if (parentSession) {
+        await supabase.auth.setSession({
+          access_token: parentSession.access_token,
+          refresh_token: parentSession.refresh_token,
+        });
+      }
+      // Link child under parent's family index on this device.
+      const idxKey = `ts_family_children_${parentEmailLower}`;
+      const existing: string[] = JSON.parse(localStorage.getItem(idxKey) || "[]");
+      if (!existing.includes(email)) existing.push(email);
+      localStorage.setItem(idxKey, JSON.stringify(existing));
+      // Flag by-email so a fresh child sign-in on any device is recognized as child.
+      localStorage.setItem(`ts_child_parent_by_email_${email}`, parentEmailLower);
+      // If we know the child's user id, seed role locally too.
+      const childId = data.user?.id;
+      if (childId) {
+        localStorage.setItem(`ts_role_${childId}`, "child");
+        localStorage.setItem(`ts_parent_email_${childId}`, parentEmailLower);
+      }
+      // Promote current (parent) user to parent role.
+      localStorage.setItem(`ts_role_${user.id}`, "parent");
+      localStorage.setItem("ts_role", "parent");
+      setRole("parent");
+      toast.success("Child account created", {
+        description: `Sign in on their device with ${email} and the password you chose.`,
+      });
+      setChildEmail("");
+      setChildPassword("");
+      setChildPasswordConfirm("");
+      setChildDialogOpen(false);
+    } catch (err) {
+      // Best-effort restore of parent session on failure.
+      if (parentSession) {
+        await supabase.auth.setSession({
+          access_token: parentSession.access_token,
+          refresh_token: parentSession.refresh_token,
+        });
+      }
+      const msg = err instanceof Error ? err.message : "Could not create child account";
+      toast.error("Sign-up failed", { description: msg });
+    } finally {
+      setChildBusy(false);
+    }
   };
 
   if (authLoading || !user) {
@@ -1386,33 +1464,64 @@ const Index = () => {
           <DialogHeader>
             <DialogTitle>Set up child account</DialogTitle>
             <DialogDescription>
-              We'll sign you out and open Google so your child can sign in with their own Google account.
-              Their new account will be linked to yours ({user?.email}) — their alerts appear in your Family tab,
-              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+              Create your child's Trust Shield account right now. You choose the password, then sign in on their
+              device with it. Their account will be linked to yours ({user?.email}) — alerts appear in your Family
+              tab, and Passwords, File scanner, Network safety, and Extensions are hidden from them.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
-            Pick your child's Google account on the next screen. When it finishes, sign back in with your own
-            Google account (or email/password) to see their alerts in the Family tab.
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="child-email">Child's email</Label>
+              <Input
+                id="child-email"
+                type="email"
+                value={childEmail}
+                onChange={(e) => setChildEmail(e.target.value)}
+                placeholder="kid@example.com"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div>
+              <Label htmlFor="child-password">Choose a password</Label>
+              <Input
+                id="child-password"
+                type="password"
+                value={childPassword}
+                onChange={(e) => setChildPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div>
+              <Label htmlFor="child-password-confirm">Confirm password</Label>
+              <Input
+                id="child-password-confirm"
+                type="password"
+                value={childPasswordConfirm}
+                onChange={(e) => setChildPasswordConfirm(e.target.value)}
+                placeholder="Re-enter password"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              You'll stay signed in as the parent. On your child's device, open Trust Shield and log in with this
+              email and password.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setChildDialogOpen(false)} disabled={childBusy}>
               Cancel
             </Button>
             <Button
-              variant="outline"
-              onClick={startChildEmailSignup}
-              disabled={childBusy}
-            >
-              Use email instead
-            </Button>
-            <Button
-              onClick={startChildSignup}
+              onClick={createChildAccount}
               disabled={childBusy}
               className="bg-gradient-shield hover:opacity-90 glow-shield"
             >
               {childBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Users className="w-4 h-4 mr-2" />}
-              Continue with Google
+              Create child account
             </Button>
           </DialogFooter>
         </DialogContent>
