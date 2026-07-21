@@ -3151,6 +3151,27 @@ function FamilyView({
     toast.success(`Removed ${childEmail} from family`);
   };
 
+  const downloadChildExtension = () => {
+    fetch("/trust-shield-child-extension.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "trust-shield-child-extension.zip";
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast.success("Child extension downloaded", {
+          description:
+            "Unzip it on your child's device, open chrome://extensions (or edge://extensions), enable Developer mode, then click 'Load unpacked'.",
+          duration: 10000,
+        });
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
   return (
     <div className="space-y-4">
       <Card>
