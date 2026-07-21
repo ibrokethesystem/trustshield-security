@@ -43,13 +43,25 @@ const Auth = () => {
       if (isChild) {
         // Child sign-in only: the account was created by the parent from the dashboard.
         const pe = parentEmail.trim().toLowerCase();
-        // Try both the labelled ("") and legacy no-label derivations so any
-        // child account created under this parent can sign in with just the
-        // parent's email + the child's password.
-        const candidates = [
-          await childEmailFor(pe, ""),
-          await childEmailFor(pe),
-        ];
+        // Ask the server for all child_email values linked to this parent
+        // (multi-child, arbitrary labels), then fall back to derivation-based
+        // guesses for legacy single-child accounts.
+        const candidates: string[] = [];
+        try {
+          const { data: rows } = await supabase.rpc("list_child_emails_for_parent", {
+            _parent_email: pe,
+          });
+          if (Array.isArray(rows)) {
+            for (const r of rows) {
+              const em = (r as { child_email?: string }).child_email;
+              if (em && !candidates.includes(em)) candidates.push(em);
+            }
+          }
+        } catch {
+          // ignore; fall through to derivation guesses
+        }
+        candidates.push(await childEmailFor(pe, ""));
+        candidates.push(await childEmailFor(pe));
         let signedIn = false;
         let lastErr: unknown = null;
         for (const cand of candidates) {
