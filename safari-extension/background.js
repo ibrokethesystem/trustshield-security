@@ -19,11 +19,17 @@ async function fetchWebsiteRating(url) {
     const host = new URL(url).hostname.toLowerCase();
     const cached = ratingCache.get(host);
     if (cached && Date.now() - cached.ts < RATING_TTL_MS) return cached;
+    const { ts_session } = await chrome.storage.local.get("ts_session");
+    if (!ts_session?.access_token) return null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 3500);
     const res = await fetch(RATING_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": RATING_APIKEY },
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": RATING_APIKEY,
+        "Authorization": `Bearer ${ts_session.access_token}`,
+      },
       body: JSON.stringify({ url }),
       signal: controller.signal,
     });
