@@ -3124,6 +3124,7 @@ function FamilyView({
   parentUserId,
   onRefresh,
   onClear,
+  onAskGuardian,
 }: {
   alerts: {
     id: string;
