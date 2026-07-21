@@ -1,10 +1,29 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const VT_KEY = Deno.env.get('VIRUSTOTAL_API_KEY') ?? '';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Not signed in' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: userData } = await supabase.auth.getUser(token);
+    if (!userData?.user) {
+      return new Response(JSON.stringify({ error: 'Not signed in' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if (!VT_KEY) throw new Error('VIRUSTOTAL_API_KEY not configured');
     const { file_base64, filename } = await req.json();
     if (!file_base64 || typeof file_base64 !== 'string') {
