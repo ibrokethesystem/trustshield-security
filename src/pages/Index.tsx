@@ -2025,6 +2025,8 @@ function GuardianView({
           mode,
           threat_id: mode === "threat" ? selectedThreatId : undefined,
           messages: next,
+          audience:
+            (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
           vault_summary: (() => {
             try {
               const raw = localStorage.getItem(`trust-shield:vault-summary:current`);
