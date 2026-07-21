@@ -1105,6 +1105,28 @@ const Index = () => {
               />
             </div>
 
+            {role !== "child" && (
+              <Card>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm">Have a child?</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Set up a monitored child account. Their alerts land in your Family tab and risky tabs are hidden from them.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setChildDialogOpen(true)}
+                    className="bg-gradient-shield hover:opacity-90 glow-shield"
+                  >
+                    <Users className="w-4 h-4 mr-2" /> Set up child account
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {/* Trend chart */}
             <Card>
               <div className="flex items-center justify-between mb-3">
