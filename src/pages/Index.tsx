@@ -1616,16 +1616,31 @@ const Index = () => {
           <DialogHeader>
             <DialogTitle>Set up child account</DialogTitle>
             <DialogDescription>
-              Create your child's Trust Shield account right now. You choose the password, then sign in on their
-              device with it. Their account will be linked to yours ({user?.email}) — alerts appear in your Family
-              tab, and Passwords, File scanner, Network safety, and Extensions are hidden from them.
+              Create your child's Trust Shield account right now. You choose the name and password, then sign in on
+              their device with it. You can set up more than one child — just use a different name and password for
+              each one. Their account will be linked to yours ({user?.email}) — alerts appear in your Family tab,
+              and Passwords, File scanner, Network safety, and Extensions are hidden from them.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg bg-secondary/40 border border-border p-3 text-xs text-muted-foreground">
-              Your child will sign in on their device using <span className="text-foreground font-medium">{user?.email}</span> as
-              the parent email and the password you choose below. Trust Shield handles the actual account behind the scenes — no
-              extra email needed.
+              Your child will sign in on their device using <span className="text-foreground font-medium">{user?.email}</span>
+              {" "}as the parent email, the name you pick below, and the password you choose. Trust Shield handles
+              the actual account behind the scenes — no extra email needed.
+            </div>
+            <div>
+              <Label htmlFor="child-name">Child's name</Label>
+              <Input
+                id="child-name"
+                value={childName}
+                onChange={(e) => setChildName(e.target.value)}
+                placeholder="e.g. Alex"
+                disabled={childBusy}
+                className="bg-secondary border-border"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Each child on your account needs a different name (and different password).
+              </p>
             </div>
             <div>
               <Label htmlFor="child-password">Choose a password</Label>
