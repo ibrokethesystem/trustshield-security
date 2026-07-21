@@ -794,15 +794,83 @@ const Index = () => {
     // Redirect handles the rest.
   };
 
-  const startChildEmailSignup = async () => {
+  const createChildAccount = async () => {
     if (!user?.email) {
       toast.error("Sign in first");
       return;
     }
+    const email = childEmail.trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      toast.error("Enter a valid email for the child account");
+      return;
+    }
+    if (childPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (childPassword !== childPasswordConfirm) {
+      toast.error("Passwords don't match");
+      return;
+    }
     setChildBusy(true);
-    localStorage.setItem("ts_pending_child_signup", user.email.toLowerCase());
-    await supabase.auth.signOut();
-    navigate("/auth", { replace: true });
+    // Save parent session so we can restore it after Supabase auto-signs-in the new child.
+    const { data: parentSessionData } = await supabase.auth.getSession();
+    const parentSession = parentSessionData.session;
+    const parentEmailLower = user.email.toLowerCase();
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: childPassword,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: { role: "child", parent_email: parentEmailLower },
+        },
+      });
+      if (error) throw error;
+      // Restore the parent's session immediately (auto-confirm signs the child in).
+      if (parentSession) {
+        await supabase.auth.setSession({
+          access_token: parentSession.access_token,
+          refresh_token: parentSession.refresh_token,
+        });
+      }
+      // Link child under parent's family index on this device.
+      const idxKey = `ts_family_children_${parentEmailLower}`;
+      const existing: string[] = JSON.parse(localStorage.getItem(idxKey) || "[]");
+      if (!existing.includes(email)) existing.push(email);
+      localStorage.setItem(idxKey, JSON.stringify(existing));
+      // Flag by-email so a fresh child sign-in on any device is recognized as child.
+      localStorage.setItem(`ts_child_parent_by_email_${email}`, parentEmailLower);
+      // If we know the child's user id, seed role locally too.
+      const childId = data.user?.id;
+      if (childId) {
+        localStorage.setItem(`ts_role_${childId}`, "child");
+        localStorage.setItem(`ts_parent_email_${childId}`, parentEmailLower);
+      }
+      // Promote current (parent) user to parent role.
+      localStorage.setItem(`ts_role_${user.id}`, "parent");
+      localStorage.setItem("ts_role", "parent");
+      setRole("parent");
+      toast.success("Child account created", {
+        description: `Sign in on their device with ${email} and the password you chose.`,
+      });
+      setChildEmail("");
+      setChildPassword("");
+      setChildPasswordConfirm("");
+      setChildDialogOpen(false);
+    } catch (err) {
+      // Best-effort restore of parent session on failure.
+      if (parentSession) {
+        await supabase.auth.setSession({
+          access_token: parentSession.access_token,
+          refresh_token: parentSession.refresh_token,
+        });
+      }
+      const msg = err instanceof Error ? err.message : "Could not create child account";
+      toast.error("Sign-up failed", { description: msg });
+    } finally {
+      setChildBusy(false);
+    }
   };
 
   if (authLoading || !user) {
