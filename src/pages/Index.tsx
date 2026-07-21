@@ -928,6 +928,16 @@ const Index = () => {
       if (childId) {
         localStorage.setItem(`ts_role_${childId}`, "child");
         localStorage.setItem(`ts_parent_email_${childId}`, parentEmailLower);
+        // Register the parent↔child link in the backend so the Family tab
+        // can pull the child's browsing activity and manage banned sites.
+        try {
+          await supabase
+            .from("child_links")
+            .upsert(
+              { parent_id: user.id, child_id: childId, child_email: email },
+              { onConflict: "child_id" },
+            );
+        } catch { /* non-fatal */ }
       }
       // Promote current (parent) user to parent role.
       localStorage.setItem(`ts_role_${user.id}`, "parent");
