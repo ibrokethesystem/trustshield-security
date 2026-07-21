@@ -3280,8 +3280,28 @@ function FamilyView({
 
   const removeAllChildren = async () => {
     setConfirmRemoveAll(false);
-    if (children.length === 0) return;
-    const list = [...children];
+    // Gather every child linked to this parent — both local state AND any
+    // rows in child_links that this device doesn't know about (e.g. added
+    // from another device). We rely on RLS + parent_id to scope to us.
+    const collected = new Set<string>(children.map((c) => c.toLowerCase()));
+    if (parentUserId) {
+      try {
+        const { data } = await supabase
+          .from("child_links")
+          .select("child_email")
+          .eq("parent_id", parentUserId);
+        (data ?? []).forEach((row: { child_email?: string | null }) => {
+          if (row.child_email) collected.add(row.child_email.toLowerCase());
+        });
+      } catch {
+        /* fall back to local-only list */
+      }
+    }
+    const list = Array.from(collected);
+    if (list.length === 0) {
+      toast("No child accounts linked to delete");
+      return;
+    }
     let failed: string[] = [];
     for (const childEmail of list) {
       try {
