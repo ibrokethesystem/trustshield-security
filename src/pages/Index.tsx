@@ -72,6 +72,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.0",
+    version: "2.0.0",
+    name: "QR code scanner (mobile)",
+    date: "2026-07-21",
+    summary:
+      "Added a QR code scanner tab. On mobile, Trust Shield uses your camera to scan QR codes and warn you before opening malicious links. Desktop shows a notice that the scanner is mobile-only.",
+  },
+  {
     id: "1.9.9",
     version: "1.9.9",
     name: "Device scanner in Network safety",
