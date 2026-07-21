@@ -89,6 +89,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.2",
+    version: "2.0.2",
+    name: "Parents can turn CyberEdu off",
+    date: "2026-07-21",
+    summary:
+      "Parents can now hide the CyberEdu tab from a linked child's sidebar. From Family → the selected child card, tap \"Turn CyberEdu off\" and the lessons and minigames disappear from that child's account until you turn it back on. The child's CyberEdu progress is preserved.",
+  },
+  {
     id: "2.0.1",
     version: "2.0.1",
     name: "Unblock reasons & polish",
@@ -317,6 +325,7 @@ const Index = () => {
   const [view, setView] = useState<ViewKey>("dashboard");
   const [role, setRole] = useState<Role>("solo");
   const [parentEmail, setParentEmail] = useState<string>("");
+  const [eduDisabled, setEduDisabled] = useState<boolean>(false);
   const [familyAlerts, setFamilyAlerts] = useState<
     { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
   >([]);
@@ -352,8 +361,14 @@ const Index = () => {
     if (role === "child" && n.hideForChild) return false;
     if (n.parentOnly && role !== "parent") return false;
     if (n.childOnly && role !== "child") return false;
+    if (n.key === "cyberedu" && role === "child" && eduDisabled) return false;
     return true;
   });
+  // If the parent turns CyberEdu off while the child is viewing it, bounce
+  // back to the dashboard so they don't stay on a hidden tab.
+  useEffect(() => {
+    if (role === "child" && eduDisabled && view === "cyberedu") setView("dashboard");
+  }, [role, eduDisabled, view]);
   // Dev feature auto-removes at v2.5.0 per spec.
   const devFeatureAvailable = cmpVersion(latestVersion, "2.5.0") < 0;
   const effectiveDevUnlocked = devUnlocked && devFeatureAvailable;
@@ -560,6 +575,34 @@ const Index = () => {
     setRole(nextRole);
     setParentEmail(localStorage.getItem(parentKey) ?? "");
   }, [user]);
+
+  // Children: watch the parent-controlled CyberEdu switch on child_links.
+  useEffect(() => {
+    if (!user || role !== "child") { setEduDisabled(false); return; }
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("child_links")
+        .select("edu_disabled")
+        .eq("child_id", user.id)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!cancelled) setEduDisabled(!!data?.edu_disabled);
+    };
+    load();
+    const channel = supabase
+      .channel(`child-edu-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "child_links", filter: `child_id=eq.${user.id}` },
+        (payload) => {
+          const row = payload.new as { edu_disabled?: boolean };
+          setEduDisabled(!!row.edu_disabled);
+        },
+      )
+      .subscribe();
+    return () => { cancelled = true; supabase.removeChannel(channel); };
+  }, [user, role]);
 
   const loadFamilyAlerts = useCallback(() => {
     if (!user) return;

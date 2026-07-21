@@ -71,6 +71,7 @@ export type Database = {
           child_id: string
           created_at: string
           deleted_at: string | null
+          edu_disabled: boolean
           id: string
           label: string | null
           parent_id: string
@@ -80,6 +81,7 @@ export type Database = {
           child_id: string
           created_at?: string
           deleted_at?: string | null
+          edu_disabled?: boolean
           id?: string
           label?: string | null
           parent_id: string
@@ -89,6 +91,7 @@ export type Database = {
           child_id?: string
           created_at?: string
           deleted_at?: string | null
+          edu_disabled?: boolean
           id?: string
           label?: string | null
           parent_id?: string
