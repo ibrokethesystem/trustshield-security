@@ -53,19 +53,42 @@
       "background:#0f172a;color:#e2e8f0;border:1px solid #1e40af;border-radius:12px;" +
       "padding:12px 14px;font:13px/1.4 -apple-system,system-ui,sans-serif;" +
       "box-shadow:0 10px 30px rgba(0,0,0,.45);";
-    bar.innerHTML =
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
-      '<span style="width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:inline-flex;align-items:center;justify-content:center;font-weight:700;">🛡</span>' +
-      '<b>Trust Shield autofill</b></div>' +
-      '<div style="color:#94a3b8;margin-bottom:8px;">Fill saved credentials for <b style="color:#e2e8f0">' +
-      (match.label || match.url) + '</b>?</div>' +
-      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
-      '<button id="__ts_af_no__" style="background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:6px 10px;cursor:pointer;">Not now</button>' +
-      '<button id="__ts_af_yes__" style="background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;">Autofill</button>' +
-      '</div>';
+    const header = document.createElement("div");
+    header.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:6px;";
+    const badge = document.createElement("span");
+    badge.style.cssText = "width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:inline-flex;align-items:center;justify-content:center;font-weight:700;";
+    badge.textContent = "🛡";
+    const title = document.createElement("b");
+    title.textContent = "Trust Shield autofill";
+    header.appendChild(badge);
+    header.appendChild(title);
+
+    const msg = document.createElement("div");
+    msg.style.cssText = "color:#94a3b8;margin-bottom:8px;";
+    msg.appendChild(document.createTextNode("Fill saved credentials for "));
+    const nameEl = document.createElement("b");
+    nameEl.style.cssText = "color:#e2e8f0";
+    nameEl.textContent = String(match.label || match.url || "");
+    msg.appendChild(nameEl);
+    msg.appendChild(document.createTextNode("?"));
+
+    const actions = document.createElement("div");
+    actions.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+    const noBtn = document.createElement("button");
+    noBtn.style.cssText = "background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:8px;padding:6px 10px;cursor:pointer;";
+    noBtn.textContent = "Not now";
+    const yesBtn = document.createElement("button");
+    yesBtn.style.cssText = "background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer;";
+    yesBtn.textContent = "Autofill";
+    actions.appendChild(noBtn);
+    actions.appendChild(yesBtn);
+
+    bar.appendChild(header);
+    bar.appendChild(msg);
+    bar.appendChild(actions);
     document.documentElement.appendChild(bar);
-    document.getElementById("__ts_af_no__").onclick = () => bar.remove();
-    document.getElementById("__ts_af_yes__").onclick = () => {
+    noBtn.onclick = () => bar.remove();
+    yesBtn.onclick = () => {
       const f = findFields();
       if (f && f.pw) {
         if (f.user && match.username) setNative(f.user, match.username);
