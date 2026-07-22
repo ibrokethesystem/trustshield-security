@@ -118,6 +118,7 @@ async function sha256Hex(text: string): Promise<string> {
 // derive the key and read them.
 
 const ENC_PREFIX = "enc:v1:";
+const DEVICE_KEY_LS = (uid: string) => `trust-shield:vault-devkey:${uid}`;
 
 function bytesToB64(bytes: Uint8Array): string {
   let s = "";
@@ -194,6 +195,30 @@ async function decryptEntry(key: CryptoKey, e: VaultEntry): Promise<VaultEntry> 
     username: await decryptField(key, e.username),
     notes: await decryptField(key, e.notes),
   };
+}
+
+// ===== Always-on device key =====
+// A random AES-GCM key kept in localStorage per user. Used to encrypt vault
+// fields whenever the optional PIN lock is off, so passwords are never
+// written to the database in plaintext.
+async function getOrCreateDeviceKey(userId: string): Promise<CryptoKey> {
+  const lsKey = DEVICE_KEY_LS(userId);
+  let rawB64 = "";
+  try { rawB64 = localStorage.getItem(lsKey) ?? ""; } catch {}
+  let raw: Uint8Array;
+  if (rawB64) {
+    raw = b64ToBytes(rawB64);
+  } else {
+    raw = crypto.getRandomValues(new Uint8Array(32));
+    try { localStorage.setItem(lsKey, bytesToB64(raw)); } catch {}
+  }
+  return crypto.subtle.importKey(
+    "raw", raw as BufferSource, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"],
+  );
+}
+
+function isEncrypted(v: string | null | undefined): boolean {
+  return !!v && typeof v === "string" && v.startsWith(ENC_PREFIX);
 }
 
 const WEBAUTHN_LOCAL_KEY = (uid: string) => `trust-shield:webauthn:${uid}`;
@@ -371,11 +396,34 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
         const { data: rows } = await supabase
           .from("vault_entries").select("*").eq("user_id", userId).order("updated_at", { ascending: false });
         if (cancelled) return;
-        const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
+        const rawList: VaultEntry[] = (rows ?? []).map((r: any) => ({
           id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
         }));
-        setEntries(list);
-        updateSummary(list);
+        // Always-on encryption: decrypt anything that's already ciphertext,
+        // and migrate any legacy plaintext rows by re-encrypting them.
+        const devKey = await getOrCreateDeviceKey(userId);
+        const decrypted: VaultEntry[] = [];
+        for (const e of rawList) {
+          const needsMigration =
+            !isEncrypted(e.password) || (e.username && !isEncrypted(e.username)) || (e.notes && !isEncrypted(e.notes));
+          if (needsMigration) {
+            try {
+              const enc = await encryptEntryFields(devKey, {
+                password: e.password, username: e.username, notes: e.notes,
+              });
+              await supabase.from("vault_entries")
+                .update(enc as any).eq("id", e.id).eq("user_id", userId);
+              decrypted.push(e);
+            } catch {
+              decrypted.push(e);
+            }
+          } else {
+            decrypted.push(await decryptEntry(devKey, e));
+          }
+        }
+        setDerivedKey(devKey);
+        setEntries(decrypted);
+        updateSummary(decrypted);
       } else {
         setEntries([]);
       }
@@ -547,12 +595,16 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
     if (!userId) return;
     setBusy(true);
     try {
-      // Decrypt every entry back to plaintext before removing the lock, so
-      // the vault keeps working (and stays readable) after the PIN is gone.
+      // Re-encrypt every entry with the always-on device key before removing
+      // the PIN lock, so passwords are never written to the database in
+      // plaintext even when the optional lock is off.
+      const devKey = await getOrCreateDeviceKey(userId);
       for (const e of entries) {
+        const enc = await encryptEntryFields(devKey, {
+          password: e.password, username: e.username, notes: e.notes,
+        });
         await supabase.from("vault_entries")
-          .update({ password: e.password, username: e.username, notes: e.notes } as any)
-          .eq("id", e.id).eq("user_id", userId);
+          .update(enc as any).eq("id", e.id).eq("user_id", userId);
       }
       const { error } = await supabase.from("vault_settings").upsert({
         user_id: userId, lock_enabled: false, pin_hash: null, pin_salt: null,
@@ -560,7 +612,7 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       if (error) throw error;
       try { localStorage.removeItem(WEBAUTHN_LOCAL_KEY(userId)); } catch {}
       setLockEnabled(false); setPinHash(null); setPinSalt(null); setUnlocked(true); setFingerprintReady(false);
-      setDerivedKey(null);
+      setDerivedKey(devKey);
       toast.success("Vault lock removed");
     } catch (e) {
       toast.error("Couldn't disable lock", { description: e instanceof Error ? e.message : "" });
