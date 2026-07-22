@@ -68,10 +68,13 @@ async function getChildSession() {
 }
 
 document.getElementById("askPerm").addEventListener("click", async () => {
-  // Show the reason textarea instead of sending immediately.
-  document.getElementById("reasonWrap").style.display = "block";
-  document.getElementById("askPerm").style.display = "none";
-  document.getElementById("reason").focus();
+  // Open a dedicated page in a new tab so the child can write their reason.
+  const url = chrome.runtime.getURL("ask-permission.html") + "?url=" + encodeURIComponent(target);
+  try {
+    await chrome.tabs.create({ url });
+  } catch {
+    window.open(url, "_blank");
+  }
 });
 
 document.getElementById("cancelReason").addEventListener("click", () => {
