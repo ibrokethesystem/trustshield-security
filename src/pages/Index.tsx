@@ -2913,6 +2913,15 @@ function GuardianView({
   const [sending, setSending] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [canAttachImages, setCanAttachImages] = useState<boolean>(() => hasFeatureAt("2.0.5"));
+  useEffect(() => {
+    const update = () => setCanAttachImages(hasFeatureAt("2.0.5"));
+    window.addEventListener("ts:version-change", update);
+    return () => window.removeEventListener("ts:version-change", update);
+  }, []);
+  useEffect(() => {
+    if (!canAttachImages && pendingImages.length) setPendingImages([]);
+  }, [canAttachImages, pendingImages.length]);
 
   const handleImagePick = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
