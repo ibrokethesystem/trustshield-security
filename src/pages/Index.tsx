@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.6",
+    version: "2.0.6",
+    name: "Version switcher hotfix",
+    date: "2026-07-22",
+    summary:
+      "Hotfix: the version switcher now correctly hides features that shipped after the selected version. Reverting to a release before v2.0.5 hides the image-attach button in Cyber Guardian, and reverting to a release before v1.9.7 restores the original Trust Shield logo in the sidebar. Newer code is still saved — return to the latest version to bring everything back.",
+  },
+  {
     id: "2.0.5",
     version: "2.0.5",
     name: "Send photos to Cyber Guardian",
@@ -1150,11 +1158,17 @@ const Index = () => {
       {/* Sidebar */}
       <aside className="w-64 shrink-0 border-r border-border bg-card/40 flex flex-col p-4 gap-2 sticky top-0 h-screen">
         <div className="flex items-center gap-3 px-2 py-3 mb-2">
-          <img
-            src={trustShieldLogo}
-            alt="Trust Shield logo"
-            className="w-10 h-10 rounded-xl object-contain"
-          />
+          {hasFeature("1.9.7") ? (
+            <img
+              src={trustShieldLogo}
+              alt="Trust Shield logo"
+              className="w-10 h-10 rounded-xl object-contain"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-gradient-shield flex items-center justify-center">
+              <Shield className="w-6 h-6 text-primary-foreground" />
+            </div>
+          )}
           <div>
             <h1 className="font-bold text-base leading-tight">Trust Shield</h1>
             <p className="text-[11px] text-muted-foreground">Scam & Hack Detector</p>
@@ -2899,6 +2913,15 @@ function GuardianView({
   const [sending, setSending] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [canAttachImages, setCanAttachImages] = useState<boolean>(() => hasFeatureAt("2.0.5"));
+  useEffect(() => {
+    const update = () => setCanAttachImages(hasFeatureAt("2.0.5"));
+    window.addEventListener("ts:version-change", update);
+    return () => window.removeEventListener("ts:version-change", update);
+  }, []);
+  useEffect(() => {
+    if (!canAttachImages && pendingImages.length) setPendingImages([]);
+  }, [canAttachImages, pendingImages.length]);
 
   const handleImagePick = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -3139,28 +3162,32 @@ function GuardianView({
           )}
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              handleImagePick(e.target.files);
-              if (imageInputRef.current) imageInputRef.current.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 shrink-0"
-            disabled={sending || pendingImages.length >= 4}
-            onClick={() => imageInputRef.current?.click()}
-            title="Attach image"
-          >
-            <ImagePlus className="w-4 h-4" />
-          </Button>
+          {canAttachImages && (
+            <>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  handleImagePick(e.target.files);
+                  if (imageInputRef.current) imageInputRef.current.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                disabled={sending || pendingImages.length >= 4}
+                onClick={() => imageInputRef.current?.click()}
+                title="Attach image"
+              >
+                <ImagePlus className="w-4 h-4" />
+              </Button>
+            </>
+          )}
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -3190,7 +3217,7 @@ function GuardianView({
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        {pendingImages.length > 0 && (
+        {canAttachImages && pendingImages.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {pendingImages.map((src, i) => (
               <div key={i} className="relative">
