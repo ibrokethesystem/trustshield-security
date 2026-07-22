@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.5",
+    version: "2.0.5",
+    name: "Send photos to Cyber Guardian",
+    date: "2026-07-22",
+    summary:
+      "You can now attach images (screenshots of suspicious emails, texts, pop-ups, DMs, or QR codes) directly in the Cyber Guardian chat. Tap the image button next to the message box, add up to 4 pictures, and Cyber Guardian will read them alongside your question.",
+  },
+  {
     id: "2.0.4",
     version: "2.0.4",
     name: "New ad link & autofill XSS fix",
