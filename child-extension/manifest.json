@@ -41,7 +41,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "warning.html"
+        "warning.html",
+        "ask-permission.html"
       ],
       "matches": [
         "<all_urls>"
