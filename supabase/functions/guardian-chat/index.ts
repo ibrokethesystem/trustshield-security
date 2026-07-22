@@ -5,7 +5,7 @@ const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!;
 
-type Msg = { role: 'user' | 'assistant'; content: string };
+type Msg = { role: 'user' | 'assistant'; content: string | Array<Record<string, unknown>> };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -154,7 +154,12 @@ ${context}`;
 
     const chatMessages = [
       { role: 'system', content: finalSystemPrompt },
-      ...messages.map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) })),
+      ...messages.map((m) => ({
+        role: m.role,
+        content: Array.isArray(m.content)
+          ? m.content
+          : String(m.content).slice(0, 2000),
+      })),
     ];
 
     const callModel = async (model: string) => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -40,6 +40,8 @@ import {
   QrCode,
   GraduationCap,
   Undo2,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import CyberEduView from "@/components/CyberEduView";
@@ -88,6 +90,14 @@ import {
 type UpdateNote = { id: string; version: string; name: string; date: string; summary: string };
 
 const UPDATES: UpdateNote[] = [
+  {
+    id: "2.0.5",
+    version: "2.0.5",
+    name: "Send photos to Cyber Guardian",
+    date: "2026-07-22",
+    summary:
+      "You can now attach images (screenshots of suspicious emails, texts, pop-ups, DMs, or QR codes) directly in the Cyber Guardian chat. Tap the image button next to the message box, add up to 4 pictures, and Cyber Guardian will read them alongside your question.",
+  },
   {
     id: "2.0.4",
     version: "2.0.4",
@@ -2882,9 +2892,35 @@ function GuardianView({
     activeThreats.length > 0 ? "all" : "general",
   );
   const [selectedThreatId, setSelectedThreatId] = useState<string | "">("");
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "assistant"; content: string; images?: string[] }[]
+  >([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImagePick = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const picks = Array.from(files).slice(0, 4 - pendingImages.length);
+    const readers = await Promise.all(
+      picks.map(
+        (f) =>
+          new Promise<string | null>((resolve) => {
+            if (!f.type.startsWith("image/")) return resolve(null);
+            if (f.size > 6 * 1024 * 1024) {
+              toast.error(`${f.name} is over 6 MB.`);
+              return resolve(null);
+            }
+            const r = new FileReader();
+            r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
+            r.onerror = () => resolve(null);
+            r.readAsDataURL(f);
+          }),
+      ),
+    );
+    setPendingImages((cur) => [...cur, ...readers.filter((x): x is string => !!x)].slice(0, 4));
+  };
 
   useEffect(() => {
     if (prefill) {
@@ -2920,21 +2956,36 @@ function GuardianView({
 
   const send = async (override?: string) => {
     const text = (override ?? input).trim();
-    if (!text || sending) return;
+    if ((!text && pendingImages.length === 0) || sending) return;
     if (mode === "threat" && !selectedThreatId) {
       toast.error("Pick an alert to discuss first.");
       return;
     }
-    const next = [...messages, { role: "user" as const, content: text }];
+    const imgs = pendingImages;
+    const next = [
+      ...messages,
+      { role: "user" as const, content: text, images: imgs.length ? imgs : undefined },
+    ];
     setMessages(next);
     setInput("");
+    setPendingImages([]);
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("guardian-chat", {
         body: {
           mode,
           threat_id: mode === "threat" ? selectedThreatId : undefined,
-          messages: next,
+          messages: next.map((m) =>
+            m.images && m.images.length
+              ? {
+                  role: m.role,
+                  content: [
+                    ...(m.content ? [{ type: "text", text: m.content }] : []),
+                    ...m.images.map((url) => ({ type: "image_url", image_url: { url } })),
+                  ],
+                }
+              : { role: m.role, content: m.content },
+          ),
           audience:
             (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
           vault_summary: (() => {
@@ -2960,6 +3011,7 @@ function GuardianView({
       toast.error("Cyber Guardian error", { description: msg });
       setMessages((cur) => cur.slice(0, -1));
       setInput(text);
+      setPendingImages(imgs);
     } finally {
       setSending(false);
     }
@@ -3065,6 +3117,18 @@ function GuardianView({
                 )}
               >
                 {m.content}
+                {m.images && m.images.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.images.map((src, k) => (
+                      <img
+                        key={k}
+                        src={src}
+                        alt="attachment"
+                        className="max-h-40 rounded-md border border-border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -3075,6 +3139,28 @@ function GuardianView({
           )}
         </div>
         <div className="mt-3 flex items-center gap-2">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleImagePick(e.target.files);
+              if (imageInputRef.current) imageInputRef.current.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            disabled={sending || pendingImages.length >= 4}
+            onClick={() => imageInputRef.current?.click()}
+            title="Attach image"
+          >
+            <ImagePlus className="w-4 h-4" />
+          </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -3098,12 +3184,33 @@ function GuardianView({
           />
           <Button
             onClick={() => send()}
-            disabled={sending || !input.trim()}
+            disabled={sending || (!input.trim() && pendingImages.length === 0)}
             className="h-10 px-4 bg-gradient-shield hover:opacity-90"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {pendingImages.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pendingImages.map((src, i) => (
+              <div key={i} className="relative">
+                <img
+                  src={src}
+                  alt="pending attachment"
+                  className="h-16 w-16 rounded-md border border-border object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPendingImages((cur) => cur.filter((_, k) => k !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center hover:bg-secondary"
+                  aria-label="Remove image"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
