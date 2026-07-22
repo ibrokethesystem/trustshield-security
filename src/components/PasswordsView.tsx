@@ -396,11 +396,34 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
         const { data: rows } = await supabase
           .from("vault_entries").select("*").eq("user_id", userId).order("updated_at", { ascending: false });
         if (cancelled) return;
-        const list: VaultEntry[] = (rows ?? []).map((r: any) => ({
+        const rawList: VaultEntry[] = (rows ?? []).map((r: any) => ({
           id: r.id, label: r.label, username: r.username ?? "", password: r.password, notes: r.notes ?? "", url: r.url ?? "", updated_at: r.updated_at,
         }));
-        setEntries(list);
-        updateSummary(list);
+        // Always-on encryption: decrypt anything that's already ciphertext,
+        // and migrate any legacy plaintext rows by re-encrypting them.
+        const devKey = await getOrCreateDeviceKey(userId);
+        const decrypted: VaultEntry[] = [];
+        for (const e of rawList) {
+          const needsMigration =
+            !isEncrypted(e.password) || (e.username && !isEncrypted(e.username)) || (e.notes && !isEncrypted(e.notes));
+          if (needsMigration) {
+            try {
+              const enc = await encryptEntryFields(devKey, {
+                password: e.password, username: e.username, notes: e.notes,
+              });
+              await supabase.from("vault_entries")
+                .update(enc as any).eq("id", e.id).eq("user_id", userId);
+              decrypted.push(e);
+            } catch {
+              decrypted.push(e);
+            }
+          } else {
+            decrypted.push(await decryptEntry(devKey, e));
+          }
+        }
+        setDerivedKey(devKey);
+        setEntries(decrypted);
+        updateSummary(decrypted);
       } else {
         setEntries([]);
       }
