@@ -89,6 +89,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.3",
+    version: "2.0.3",
+    name: "Ask-for-permission reason (hotfix)",
+    date: "2026-07-22",
+    summary:
+      "Hotfix: on the child extension's blocked-site page, tapping \"Ask for permission\" now opens a short prompt — \"Write why you want this website unblocked\" — and the child's sentence is delivered to the parent's Family tab alongside the request so parents can decide with full context.",
+  },
+  {
     id: "2.0.2",
     version: "2.0.2",
     name: "Parents can turn CyberEdu off",
