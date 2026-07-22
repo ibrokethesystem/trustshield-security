@@ -2884,9 +2884,35 @@ function GuardianView({
     activeThreats.length > 0 ? "all" : "general",
   );
   const [selectedThreatId, setSelectedThreatId] = useState<string | "">("");
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [messages, setMessages] = useState<
+    { role: "user" | "assistant"; content: string; images?: string[] }[]
+  >([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImagePick = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const picks = Array.from(files).slice(0, 4 - pendingImages.length);
+    const readers = await Promise.all(
+      picks.map(
+        (f) =>
+          new Promise<string | null>((resolve) => {
+            if (!f.type.startsWith("image/")) return resolve(null);
+            if (f.size > 6 * 1024 * 1024) {
+              toast.error(`${f.name} is over 6 MB.`);
+              return resolve(null);
+            }
+            const r = new FileReader();
+            r.onload = () => resolve(typeof r.result === "string" ? r.result : null);
+            r.onerror = () => resolve(null);
+            r.readAsDataURL(f);
+          }),
+      ),
+    );
+    setPendingImages((cur) => [...cur, ...readers.filter((x): x is string => !!x)].slice(0, 4));
+  };
 
   useEffect(() => {
     if (prefill) {
@@ -2922,21 +2948,36 @@ function GuardianView({
 
   const send = async (override?: string) => {
     const text = (override ?? input).trim();
-    if (!text || sending) return;
+    if ((!text && pendingImages.length === 0) || sending) return;
     if (mode === "threat" && !selectedThreatId) {
       toast.error("Pick an alert to discuss first.");
       return;
     }
-    const next = [...messages, { role: "user" as const, content: text }];
+    const imgs = pendingImages;
+    const next = [
+      ...messages,
+      { role: "user" as const, content: text, images: imgs.length ? imgs : undefined },
+    ];
     setMessages(next);
     setInput("");
+    setPendingImages([]);
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("guardian-chat", {
         body: {
           mode,
           threat_id: mode === "threat" ? selectedThreatId : undefined,
-          messages: next,
+          messages: next.map((m) =>
+            m.images && m.images.length
+              ? {
+                  role: m.role,
+                  content: [
+                    ...(m.content ? [{ type: "text", text: m.content }] : []),
+                    ...m.images.map((url) => ({ type: "image_url", image_url: { url } })),
+                  ],
+                }
+              : { role: m.role, content: m.content },
+          ),
           audience:
             (typeof window !== "undefined" && localStorage.getItem("ts_role")) === "child" ? "child" : "adult",
           vault_summary: (() => {
@@ -2962,6 +3003,7 @@ function GuardianView({
       toast.error("Cyber Guardian error", { description: msg });
       setMessages((cur) => cur.slice(0, -1));
       setInput(text);
+      setPendingImages(imgs);
     } finally {
       setSending(false);
     }
