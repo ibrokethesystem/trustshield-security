@@ -595,12 +595,16 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
     if (!userId) return;
     setBusy(true);
     try {
-      // Decrypt every entry back to plaintext before removing the lock, so
-      // the vault keeps working (and stays readable) after the PIN is gone.
+      // Re-encrypt every entry with the always-on device key before removing
+      // the PIN lock, so passwords are never written to the database in
+      // plaintext even when the optional lock is off.
+      const devKey = await getOrCreateDeviceKey(userId);
       for (const e of entries) {
+        const enc = await encryptEntryFields(devKey, {
+          password: e.password, username: e.username, notes: e.notes,
+        });
         await supabase.from("vault_entries")
-          .update({ password: e.password, username: e.username, notes: e.notes } as any)
-          .eq("id", e.id).eq("user_id", userId);
+          .update(enc as any).eq("id", e.id).eq("user_id", userId);
       }
       const { error } = await supabase.from("vault_settings").upsert({
         user_id: userId, lock_enabled: false, pin_hash: null, pin_salt: null,
@@ -608,7 +612,7 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
       if (error) throw error;
       try { localStorage.removeItem(WEBAUTHN_LOCAL_KEY(userId)); } catch {}
       setLockEnabled(false); setPinHash(null); setPinSalt(null); setUnlocked(true); setFingerprintReady(false);
-      setDerivedKey(null);
+      setDerivedKey(devKey);
       toast.success("Vault lock removed");
     } catch (e) {
       toast.error("Couldn't disable lock", { description: e instanceof Error ? e.message : "" });
