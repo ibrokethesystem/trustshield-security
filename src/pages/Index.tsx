@@ -89,6 +89,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.4",
+    version: "2.0.4",
+    name: "New ad link & autofill XSS fix",
+    date: "2026-07-22",
+    summary:
+      "The Welcome page and Share dialog now point to the updated Trust Shield ad on Google Drive. Security: the Chrome, Edge, and Child extensions' autofill banner now renders saved vault labels as text nodes instead of raw HTML, preventing any HTML/script in a saved entry name from executing on visited sites.",
+  },
+  {
     id: "2.0.3",
     version: "2.0.3",
     name: "Ask-for-permission reason (hotfix)",
