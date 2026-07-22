@@ -40,6 +40,8 @@ import {
   QrCode,
   GraduationCap,
   Undo2,
+  ImagePlus,
+  X,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip as ReTooltip } from "recharts";
 import CyberEduView from "@/components/CyberEduView";
