@@ -118,6 +118,7 @@ async function sha256Hex(text: string): Promise<string> {
 // derive the key and read them.
 
 const ENC_PREFIX = "enc:v1:";
+const DEVICE_KEY_LS = (uid: string) => `trust-shield:vault-devkey:${uid}`;
 
 function bytesToB64(bytes: Uint8Array): string {
   let s = "";
@@ -194,6 +195,30 @@ async function decryptEntry(key: CryptoKey, e: VaultEntry): Promise<VaultEntry> 
     username: await decryptField(key, e.username),
     notes: await decryptField(key, e.notes),
   };
+}
+
+// ===== Always-on device key =====
+// A random AES-GCM key kept in localStorage per user. Used to encrypt vault
+// fields whenever the optional PIN lock is off, so passwords are never
+// written to the database in plaintext.
+async function getOrCreateDeviceKey(userId: string): Promise<CryptoKey> {
+  const lsKey = DEVICE_KEY_LS(userId);
+  let rawB64 = "";
+  try { rawB64 = localStorage.getItem(lsKey) ?? ""; } catch {}
+  let raw: Uint8Array;
+  if (rawB64) {
+    raw = b64ToBytes(rawB64);
+  } else {
+    raw = crypto.getRandomValues(new Uint8Array(32));
+    try { localStorage.setItem(lsKey, bytesToB64(raw)); } catch {}
+  }
+  return crypto.subtle.importKey(
+    "raw", raw as BufferSource, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"],
+  );
+}
+
+function isEncrypted(v: string | null | undefined): boolean {
+  return !!v && typeof v === "string" && v.startsWith(ENC_PREFIX);
 }
 
 const WEBAUTHN_LOCAL_KEY = (uid: string) => `trust-shield:webauthn:${uid}`;
