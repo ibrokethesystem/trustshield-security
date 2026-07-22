@@ -2,8 +2,6 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import trustShieldAd from "@/assets/trust-shield-ad.mp4.asset.json";
-
 const Welcome = () => {
   useEffect(() => {
     document.title = "Welcome · Trust Shield";
@@ -23,7 +21,12 @@ const Welcome = () => {
         </div>
 
         <div className="rounded-2xl overflow-hidden border border-border bg-black mb-6">
-          <video src={trustShieldAd.url} controls playsInline autoPlay className="w-full aspect-video" />
+          <iframe
+            src="https://drive.google.com/file/d/1Pr8k1u1KQx60MMgYHaKPxFHg22nG64Nm/preview"
+            allow="autoplay"
+            allowFullScreen
+            className="w-full aspect-video"
+          />
         </div>
 
         <Button asChild className="w-full bg-gradient-shield hover:opacity-90 glow-shield">
