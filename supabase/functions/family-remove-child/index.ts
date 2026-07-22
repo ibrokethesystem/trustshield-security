@@ -28,12 +28,19 @@ Deno.serve(async (req) => {
 
     const url = Deno.env.get("SUPABASE_URL")!;
     const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const admin = createClient(url, service, { auth: { persistSession: false } });
 
-    const { data: userData, error: uErr } = await admin.auth.getUser(token);
-    if (uErr || !userData?.user?.email) return json({ error: "Not signed in" }, 401);
-    const parent = userData.user;
-    const parentEmail = parent.email!.toLowerCase();
+    const authed = createClient(url, anon, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const { data: claimsData, error: cErr0 } = await authed.auth.getClaims(token);
+    if (cErr0 || !claimsData?.claims?.sub) return json({ error: "Not signed in" }, 401);
+    const parentId = claimsData.claims.sub as string;
+    const { data: pUser } = await admin.auth.admin.getUserById(parentId);
+    if (!pUser?.user?.email) return json({ error: "Not signed in" }, 401);
+    const parent = { id: parentId };
+    const parentEmail = pUser.user.email.toLowerCase();
 
     const body = await req.json().catch(() => ({}));
     const requestedEmail = String(body?.child_email ?? "").trim().toLowerCase();
