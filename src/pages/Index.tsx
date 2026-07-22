@@ -3109,6 +3109,18 @@ function GuardianView({
                 )}
               >
                 {m.content}
+                {m.images && m.images.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {m.images.map((src, k) => (
+                      <img
+                        key={k}
+                        src={src}
+                        alt="attachment"
+                        className="max-h-40 rounded-md border border-border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -3119,6 +3131,28 @@ function GuardianView({
           )}
         </div>
         <div className="mt-3 flex items-center gap-2">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleImagePick(e.target.files);
+              if (imageInputRef.current) imageInputRef.current.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            disabled={sending || pendingImages.length >= 4}
+            onClick={() => imageInputRef.current?.click()}
+            title="Attach image"
+          >
+            <ImagePlus className="w-4 h-4" />
+          </Button>
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -3142,12 +3176,33 @@ function GuardianView({
           />
           <Button
             onClick={() => send()}
-            disabled={sending || !input.trim()}
+            disabled={sending || (!input.trim() && pendingImages.length === 0)}
             className="h-10 px-4 bg-gradient-shield hover:opacity-90"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {pendingImages.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pendingImages.map((src, i) => (
+              <div key={i} className="relative">
+                <img
+                  src={src}
+                  alt="pending attachment"
+                  className="h-16 w-16 rounded-md border border-border object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPendingImages((cur) => cur.filter((_, k) => k !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center hover:bg-secondary"
+                  aria-label="Remove image"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );
