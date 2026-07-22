@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.6",
+    version: "2.0.6",
+    name: "Version switcher hotfix",
+    date: "2026-07-22",
+    summary:
+      "Hotfix: the version switcher now correctly hides features that shipped after the selected version. Reverting to a release before v2.0.5 hides the image-attach button in Cyber Guardian, and reverting to a release before v1.9.7 restores the original Trust Shield logo in the sidebar. Newer code is still saved — return to the latest version to bring everything back.",
+  },
+  {
     id: "2.0.5",
     version: "2.0.5",
     name: "Send photos to Cyber Guardian",
