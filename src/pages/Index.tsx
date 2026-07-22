@@ -1903,7 +1903,7 @@ function ShareDialog({
   onOpenChange: (v: boolean) => void;
 }) {
   const shareUrl = "https://trustshield-security.lovable.app/";
-  const videoUrl = "https://drive.google.com/file/d/1Pr8k1u1KQx60MMgYHaKPxFHg22nG64Nm/view?t=3.028";
+  const videoUrl = "https://drive.google.com/file/d/1Pr8k1u1KQx60MMgYHaKPxFHg22nG64Nm/view";
   const subject = "Check out Trust Shield — real-time scam & hack protection";
   const body =
     `I've been using Trust Shield to catch phishing, scam messages, and dangerous links before they hit me. ` +
@@ -1943,10 +1943,10 @@ function ShareDialog({
         </DialogHeader>
 
         <div className="rounded-xl overflow-hidden border border-border bg-black">
-          <video
-            src={trustShieldAd.url}
-            controls
-            playsInline
+          <iframe
+            src="https://drive.google.com/file/d/1Pr8k1u1KQx60MMgYHaKPxFHg22nG64Nm/preview"
+            allow="autoplay"
+            allowFullScreen
             className="w-full aspect-video"
           />
         </div>
