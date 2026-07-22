@@ -3162,28 +3162,32 @@ function GuardianView({
           )}
         </div>
         <div className="mt-3 flex items-center gap-2">
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              handleImagePick(e.target.files);
-              if (imageInputRef.current) imageInputRef.current.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-10 w-10 shrink-0"
-            disabled={sending || pendingImages.length >= 4}
-            onClick={() => imageInputRef.current?.click()}
-            title="Attach image"
-          >
-            <ImagePlus className="w-4 h-4" />
-          </Button>
+          {canAttachImages && (
+            <>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  handleImagePick(e.target.files);
+                  if (imageInputRef.current) imageInputRef.current.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-10 w-10 shrink-0"
+                disabled={sending || pendingImages.length >= 4}
+                onClick={() => imageInputRef.current?.click()}
+                title="Attach image"
+              >
+                <ImagePlus className="w-4 h-4" />
+              </Button>
+            </>
+          )}
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -3213,7 +3217,7 @@ function GuardianView({
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        {pendingImages.length > 0 && (
+        {canAttachImages && pendingImages.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {pendingImages.map((src, i) => (
               <div key={i} className="relative">
