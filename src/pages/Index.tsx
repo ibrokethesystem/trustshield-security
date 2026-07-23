@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.8",
+    version: "2.0.8",
+    name: "Parents can turn CyberEdu games off separately",
+    date: "2026-07-23",
+    summary:
+      "Family monitoring now has a second button next to \"Turn CyberEdu off\" called \"Turn CyberEdu games off.\" It hides only the mini-games section (Cyber Space Shooter, Phish or Legit, etc.) from the linked child's CyberEdu tab while keeping the lessons and quizzes available. The original \"Turn CyberEdu off\" button still hides the whole tab.",
+  },
+  {
     id: "2.0.7",
     version: "2.0.7",
     name: "CyberEdu: bigger quizzes + Cyber Space Shooter",
