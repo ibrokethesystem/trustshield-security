@@ -345,15 +345,17 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
                 >
                   {selectedLink.edu_disabled ? "Turn CyberEdu on" : "Turn CyberEdu off"}
                 </Button>
-                <Button
-                  variant={selectedLink.edu_games_disabled ? "default" : "outline"}
-                  size="sm"
-                  disabled={selectedLink.edu_disabled}
-                  onClick={() => toggleEduGames(selectedLink.child_id, !selectedLink.edu_games_disabled)}
-                  title={selectedLink.edu_disabled ? "CyberEdu is already fully off" : undefined}
-                >
-                  {selectedLink.edu_games_disabled ? "Turn CyberEdu games on" : "Turn CyberEdu games off"}
-                </Button>
+                {showGamesToggle && (
+                  <Button
+                    variant={selectedLink.edu_games_disabled ? "default" : "outline"}
+                    size="sm"
+                    disabled={selectedLink.edu_disabled}
+                    onClick={() => toggleEduGames(selectedLink.child_id, !selectedLink.edu_games_disabled)}
+                    title={selectedLink.edu_disabled ? "CyberEdu is already fully off" : undefined}
+                  >
+                    {selectedLink.edu_games_disabled ? "Turn CyberEdu games on" : "Turn CyberEdu games off"}
+                  </Button>
+                )}
               </div>
             </div>
           )}
