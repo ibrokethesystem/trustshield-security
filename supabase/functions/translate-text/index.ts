@@ -49,12 +49,13 @@ Deno.serve(async (req) => {
 
     let raw = '';
     try {
-      raw = await call('google/gemini-2.5-flash-lite');
+      // Newer Flash-Lite generation: notably faster than 2.5-flash-lite for JSON output.
+      raw = await call('google/gemini-3.1-flash-lite');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.startsWith('429')) return json({ error: 'Rate limited, try again shortly.' }, 429);
       if (msg.startsWith('402')) return json({ error: 'AI credits exhausted.' }, 402);
-      raw = await call('google/gemini-2.5-flash');
+      raw = await call('google/gemini-2.5-flash-lite');
     }
 
     // Extract array from the reply — accept many shapes, never 502.
