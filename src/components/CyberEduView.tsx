@@ -706,7 +706,20 @@ function gameBlurb(g: MiniGameKey) {
 
 function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose: () => void; onComplete: () => void }) {
   const [step, setStep] = useState<"read" | "quiz" | "done">("read");
+  const allQuestions = useMemo<Quiz[]>(
+    () => [lesson.quiz, ...(lesson.quizzes ?? [])],
+    [lesson],
+  );
+  const [qIdx, setQIdx] = useState(0);
   const [choice, setChoice] = useState<number | null>(null);
+  const [correctCount, setCorrectCount] = useState(0);
+  const currentQ = allQuestions[qIdx];
+  const isLastQ = qIdx === allQuestions.length - 1;
+  const nextQuestion = () => {
+    if (choice === currentQ.answer) setCorrectCount((c) => c + 1);
+    setChoice(null);
+    setQIdx((n) => n + 1);
+  };
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -769,16 +782,24 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
         )}
         {step === "quiz" && (
           <>
-            <p className="text-sm font-semibold">{lesson.quiz.q}</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-muted-foreground">
+                Question {qIdx + 1} of {allQuestions.length}
+              </div>
+              <div className="text-xs text-primary font-semibold">
+                Score: {correctCount} / {allQuestions.length}
+              </div>
+            </div>
+            <p className="text-sm font-semibold">{currentQ.q}</p>
             <div className="mt-3 space-y-2">
-              {lesson.quiz.choices.map((c, i) => (
+              {currentQ.choices.map((c, i) => (
                 <button
                   key={i}
                   onClick={() => setChoice(i)}
                   className={`w-full text-left p-3 rounded-lg border text-sm transition ${
                     choice === null
                       ? "bg-secondary/40 border-border hover:border-primary/40"
-                      : i === lesson.quiz.answer
+                      : i === currentQ.answer
                         ? "bg-primary/10 border-primary"
                         : i === choice
                           ? "bg-destructive/10 border-destructive"
@@ -792,15 +813,21 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
             </div>
             {choice !== null && (
               <div className="mt-3 p-3 rounded-lg bg-secondary/40 border border-border text-sm">
-                {choice === lesson.quiz.answer ? "✅ Correct! " : "❌ Not quite. "}
-                {lesson.quiz.why}
+                {choice === currentQ.answer ? "✅ Correct! " : "❌ Not quite. "}
+                {currentQ.why}
               </div>
             )}
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setChoice(null); setStep("read"); }}>Back</Button>
-              <Button onClick={onComplete} disabled={choice === null}>
-                Finish lesson
-              </Button>
+              <Button variant="outline" onClick={() => { setChoice(null); setQIdx(0); setCorrectCount(0); setStep("read"); }}>Back</Button>
+              {isLastQ ? (
+                <Button onClick={onComplete} disabled={choice === null}>
+                  Finish lesson
+                </Button>
+              ) : (
+                <Button onClick={nextQuestion} disabled={choice === null}>
+                  Next question <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -820,6 +847,7 @@ function MiniGameModal({ game, onClose, onEarnXp }: { game: MiniGameKey; onClose
         {game === "phish-or-legit" && <PhishOrLegit onEarnXp={onEarnXp} onClose={onClose} />}
         {game === "password-power" && <PasswordPower onEarnXp={onEarnXp} onClose={onClose} />}
         {game === "link-detective" && <LinkDetective onEarnXp={onEarnXp} onClose={onClose} />}
+        {game === "space-shooter" && <SpaceShooter onEarnXp={onEarnXp} onClose={onClose} />}
       </div>
     </div>
   );
