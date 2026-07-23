@@ -15,9 +15,10 @@ type Lesson = {
   sections?: Section[];
   tryThis?: string[];
   quiz: Quiz;
+  quizzes?: Quiz[];
   unlocksGame?: MiniGameKey;
 };
-type MiniGameKey = "phish-or-legit" | "password-power" | "link-detective";
+type MiniGameKey = "phish-or-legit" | "password-power" | "link-detective" | "space-shooter";
 
 const LESSONS: Lesson[] = [
   {
@@ -61,6 +62,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Free stuff messages are almost always scams. Grown-ups can help you check.",
     },
+    quizzes: [
+      {
+        q: "Which feeling do scammers try to trigger MOST often?",
+        choices: ["Boredom", "Panic or excitement", "Sleepiness"],
+        answer: 1,
+        why: "Panic and excitement make people click before thinking.",
+      },
+      {
+        q: "How long should you wait before clicking a surprising pop-up?",
+        choices: ["0 seconds", "About 10 seconds", "Never — just click"],
+        answer: 1,
+        why: "The 10-second rule gives your brain time to spot the trick.",
+      },
+      {
+        q: "A pop-up says 'Your device is INFECTED! Call this number NOW.' What is it?",
+        choices: ["A real warning", "A scam", "A software update"],
+        answer: 1,
+        why: "Real antivirus doesn't ask you to call a phone number.",
+      },
+    ],
   },
   {
     id: "l2",
@@ -104,6 +125,26 @@ const LESSONS: Lesson[] = [
       answer: 2,
       why: "Longer, mixed, and random-ish is much harder to guess.",
     },
+    quizzes: [
+      {
+        q: "What makes a password strongest?",
+        choices: ["Being short and easy", "Being long and unpredictable", "Using your pet's name"],
+        answer: 1,
+        why: "Length + randomness beats short 'clever' passwords every time.",
+      },
+      {
+        q: "What does 2-factor authentication add?",
+        choices: ["A second password to type", "A code from your phone", "A longer username"],
+        answer: 1,
+        why: "2FA needs something you HAVE (your phone) not just something you know.",
+      },
+      {
+        q: "Is it OK to use the same password on 5 sites?",
+        choices: ["Yes, easier to remember", "No — one leak breaks all 5", "Only if it's long"],
+        answer: 1,
+        why: "If one site is hacked, attackers try that password everywhere.",
+      },
+    ],
     unlocksGame: "password-power",
   },
   {
@@ -146,6 +187,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Real companies don't rush you like that. It's a classic phishing trick.",
     },
+    quizzes: [
+      {
+        q: "Which sender address is suspicious?",
+        choices: ["support@paypal.com", "support@paypa1-secure.co", "help@school.edu"],
+        answer: 1,
+        why: "The '1' instead of 'l' and weird domain give it away.",
+      },
+      {
+        q: "You clicked a phishing link by accident. First step?",
+        choices: ["Keep it a secret", "Tell a grown-up right away", "Turn off your device forever"],
+        answer: 1,
+        why: "Speaking up fast lets a grown-up help you change passwords.",
+      },
+      {
+        q: "Real companies asking for your password by email is…",
+        choices: ["Totally normal", "Almost never a real thing", "Only on Fridays"],
+        answer: 1,
+        why: "Legit companies don't email asking for your password.",
+      },
+    ],
     unlocksGame: "phish-or-legit",
   },
   {
@@ -187,6 +248,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Weird spelling and 'http' (no s) is a big warning sign.",
     },
+    quizzes: [
+      {
+        q: "In 'https://google.com.evil-site.win/login', which is the REAL site?",
+        choices: ["google.com", "evil-site.win", "login"],
+        answer: 1,
+        why: "Read from the right — the real site is what's just before the first '/'.",
+      },
+      {
+        q: "Which is the fake?",
+        choices: ["https://www.amazon.com", "https://arnazon.com", "https://amazon.co.uk"],
+        answer: 1,
+        why: "'arnazon' uses 'rn' to look like 'm' — classic lookalike trick.",
+      },
+      {
+        q: "What does the lock icon in the address bar mean?",
+        choices: ["The site is 100% safe", "The connection is encrypted", "The site is famous"],
+        answer: 1,
+        why: "The lock means encryption — NOT that the site is trustworthy.",
+      },
+    ],
     unlocksGame: "link-detective",
   },
   {
@@ -231,6 +312,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Real friends don't need private info. Always tell a grown-up.",
     },
+    quizzes: [
+      {
+        q: "Which of these is 'private' info?",
+        choices: ["Your favorite color", "Your home address", "Your Minecraft username"],
+        answer: 1,
+        why: "Address, school, phone, birthday — all private.",
+      },
+      {
+        q: "A quiz asks 20 personal questions for a 'prize'. It's probably…",
+        choices: ["A fun game", "A data-collection trap", "Homework"],
+        answer: 1,
+        why: "Long question quizzes often exist just to harvest info.",
+      },
+      {
+        q: "Someone online asks to meet you in person. What do you do?",
+        choices: ["Meet up quickly", "Tell a trusted grown-up immediately", "Send your address"],
+        answer: 1,
+        why: "ANY request to meet from an online stranger is a red flag.",
+      },
+    ],
   },
   {
     id: "l6",
@@ -272,6 +373,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Updates fix holes that hackers use. Installing them keeps you safer.",
     },
+    quizzes: [
+      {
+        q: "What color 'hat' is a helpful hacker?",
+        choices: ["Black hat", "White hat", "Red hat"],
+        answer: 1,
+        why: "White hats are the good guys who find and report bugs.",
+      },
+      {
+        q: "Which is the WORST for stopping hackers?",
+        choices: ["Long unique passwords", "Ignoring updates for a year", "Using 2-factor"],
+        answer: 1,
+        why: "Old software has known holes hackers already know how to walk through.",
+      },
+      {
+        q: "You leave your laptop at a library. Best move?",
+        choices: ["Just walk away", "Lock the screen first", "Log out of the internet"],
+        answer: 1,
+        why: "Locking stops anyone nearby from touching your accounts.",
+      },
+    ],
   },
   {
     id: "l7",
@@ -311,6 +432,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Watching or reading is fine. Save passwords and money stuff for home.",
     },
+    quizzes: [
+      {
+        q: "What's an 'evil twin' wifi network?",
+        choices: ["A backup network", "A fake wifi named like a real one", "A network with 2 routers"],
+        answer: 1,
+        why: "Attackers name their fake hotspot to look official.",
+      },
+      {
+        q: "What does a VPN mainly do?",
+        choices: ["Speeds up your device", "Encrypts your traffic in a tunnel", "Blocks all websites"],
+        answer: 1,
+        why: "A VPN wraps your data so people on the same network can't peek.",
+      },
+      {
+        q: "Best setting for public wifi?",
+        choices: ["Auto-connect to any open wifi", "Turn auto-connect OFF", "Share your hotspot to strangers"],
+        answer: 1,
+        why: "Auto-connect lets your device join fake networks without asking.",
+      },
+    ],
   },
   {
     id: "l8",
@@ -351,6 +492,27 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Grown-ups can help figure out what's real. You're a team!",
     },
+    quizzes: [
+      {
+        q: "What does 'S' stand for in the STOP method?",
+        choices: ["Shout", "Slow down", "Screenshot"],
+        answer: 1,
+        why: "Slowing down is the #1 tool against scams.",
+      },
+      {
+        q: "You get a weird message. Best evidence to save?",
+        choices: ["A screenshot", "Your feelings about it", "Nothing — just delete"],
+        answer: 0,
+        why: "Screenshots help grown-ups (and Cyber Guardian) figure out what happened.",
+      },
+      {
+        q: "Being extra cautious online is…",
+        choices: ["Embarrassing", "Smart — pros do it too", "A waste of time"],
+        answer: 1,
+        why: "Every real cybersecurity expert double-checks. So should you.",
+      },
+    ],
+    unlocksGame: "space-shooter",
   },
 ];
 
@@ -524,19 +686,40 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
 }
 
 function gameName(g: MiniGameKey) {
-  return g === "phish-or-legit" ? "Phish or Legit" : g === "password-power" ? "Password Power" : "Link Detective";
+  return g === "phish-or-legit"
+    ? "Phish or Legit"
+    : g === "password-power"
+      ? "Password Power"
+      : g === "link-detective"
+        ? "Link Detective"
+        : "Cyber Space Shooter";
 }
 function gameBlurb(g: MiniGameKey) {
   return g === "phish-or-legit"
     ? "Swipe fake vs. real emails."
     : g === "password-power"
       ? "Rank passwords from weak to strong."
-      : "Spot the sneaky URL.";
+      : g === "link-detective"
+        ? "Spot the sneaky URL."
+        : "Blast phishing bugs & viruses. Retro arcade!";
 }
 
 function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose: () => void; onComplete: () => void }) {
   const [step, setStep] = useState<"read" | "quiz" | "done">("read");
+  const allQuestions = useMemo<Quiz[]>(
+    () => [lesson.quiz, ...(lesson.quizzes ?? [])],
+    [lesson],
+  );
+  const [qIdx, setQIdx] = useState(0);
   const [choice, setChoice] = useState<number | null>(null);
+  const [correctCount, setCorrectCount] = useState(0);
+  const currentQ = allQuestions[qIdx];
+  const isLastQ = qIdx === allQuestions.length - 1;
+  const nextQuestion = () => {
+    if (choice === currentQ.answer) setCorrectCount((c) => c + 1);
+    setChoice(null);
+    setQIdx((n) => n + 1);
+  };
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-2xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -599,16 +782,24 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
         )}
         {step === "quiz" && (
           <>
-            <p className="text-sm font-semibold">{lesson.quiz.q}</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs text-muted-foreground">
+                Question {qIdx + 1} of {allQuestions.length}
+              </div>
+              <div className="text-xs text-primary font-semibold">
+                Score: {correctCount} / {allQuestions.length}
+              </div>
+            </div>
+            <p className="text-sm font-semibold">{currentQ.q}</p>
             <div className="mt-3 space-y-2">
-              {lesson.quiz.choices.map((c, i) => (
+              {currentQ.choices.map((c, i) => (
                 <button
                   key={i}
                   onClick={() => setChoice(i)}
                   className={`w-full text-left p-3 rounded-lg border text-sm transition ${
                     choice === null
                       ? "bg-secondary/40 border-border hover:border-primary/40"
-                      : i === lesson.quiz.answer
+                      : i === currentQ.answer
                         ? "bg-primary/10 border-primary"
                         : i === choice
                           ? "bg-destructive/10 border-destructive"
@@ -622,15 +813,21 @@ function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose:
             </div>
             {choice !== null && (
               <div className="mt-3 p-3 rounded-lg bg-secondary/40 border border-border text-sm">
-                {choice === lesson.quiz.answer ? "✅ Correct! " : "❌ Not quite. "}
-                {lesson.quiz.why}
+                {choice === currentQ.answer ? "✅ Correct! " : "❌ Not quite. "}
+                {currentQ.why}
               </div>
             )}
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setChoice(null); setStep("read"); }}>Back</Button>
-              <Button onClick={onComplete} disabled={choice === null}>
-                Finish lesson
-              </Button>
+              <Button variant="outline" onClick={() => { setChoice(null); setQIdx(0); setCorrectCount(0); setStep("read"); }}>Back</Button>
+              {isLastQ ? (
+                <Button onClick={onComplete} disabled={choice === null}>
+                  Finish lesson
+                </Button>
+              ) : (
+                <Button onClick={nextQuestion} disabled={choice === null}>
+                  Next question <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              )}
             </div>
           </>
         )}
@@ -650,6 +847,7 @@ function MiniGameModal({ game, onClose, onEarnXp }: { game: MiniGameKey; onClose
         {game === "phish-or-legit" && <PhishOrLegit onEarnXp={onEarnXp} onClose={onClose} />}
         {game === "password-power" && <PasswordPower onEarnXp={onEarnXp} onClose={onClose} />}
         {game === "link-detective" && <LinkDetective onEarnXp={onEarnXp} onClose={onClose} />}
+        {game === "space-shooter" && <SpaceShooter onEarnXp={onEarnXp} onClose={onClose} />}
       </div>
     </div>
   );
@@ -808,6 +1006,367 @@ function GameEnd({ score, total, onClose, onEarnXp }: { score: number; total: nu
           {claimed ? "Claimed" : "Claim XP"}
         </Button>
         <Button variant="outline" onClick={onClose}>Done</Button>
+      </div>
+    </div>
+  );
+}
+// Retro arcade "Cyber Space Shooter" — shoot phishing/malware words before they reach your device.
+function SpaceShooter({ onEarnXp, onClose }: GameProps) {
+  const canvasRef = (typeof window !== "undefined") ? undefined : undefined;
+  const ref = (typeof window !== "undefined") ? undefined : undefined;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _ = canvasRef ?? ref;
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [wave, setWave] = useState(1);
+  const [running, setRunning] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const cRef = (globalThis as any).React ? undefined : undefined;
+  const canvas = (function useCanvasRef() {
+    // simple ref replacement via useState of node
+    return undefined;
+  })();
+  void canvas;
+  // Real refs
+  const nodeRef = (function () {
+    const [n, setN] = useState<HTMLCanvasElement | null>(null);
+    return { get: () => n, set: setN };
+  })();
+
+  const stateRef = useMemo(
+    () => ({
+      ship: { x: 200, y: 380, w: 34, h: 24 },
+      bullets: [] as { x: number; y: number }[],
+      enemies: [] as { x: number; y: number; vx: number; vy: number; label: string; kind: "phish" | "virus" | "good"; hp: number }[],
+      particles: [] as { x: number; y: number; vx: number; vy: number; life: number; color: string }[],
+      keys: { left: false, right: false, fire: false },
+      lastShot: 0,
+      spawnTimer: 0,
+      running: false,
+      score: 0,
+      lives: 3,
+      wave: 1,
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const c = nodeRef.get();
+    if (!c || !running) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const W = c.width;
+    const H = c.height;
+    stateRef.running = true;
+
+    const PHISH_WORDS = ["FREE!", "WIN$$$", "CLICK", "URGENT", "PRIZE", "GIFT", "VERIFY", "R0BUX", "L0GIN"];
+    const VIRUS_WORDS = ["VIRUS", "TROJAN", "SPYWARE", "MALWARE", "WORM"];
+    const GOOD_WORDS = ["HTTPS", "2FA", "UPDATE", "BACKUP", "PATCH"];
+
+    const spawn = () => {
+      const r = Math.random();
+      const kind = r < 0.55 ? "phish" : r < 0.85 ? "virus" : "good";
+      const pool = kind === "phish" ? PHISH_WORDS : kind === "virus" ? VIRUS_WORDS : GOOD_WORDS;
+      const label = pool[Math.floor(Math.random() * pool.length)];
+      const x = 20 + Math.random() * (W - 40);
+      const vy = 0.4 + Math.random() * 0.4 + stateRef.wave * 0.15;
+      const vx = (Math.random() - 0.5) * 0.6;
+      const hp = kind === "virus" ? 2 : 1;
+      stateRef.enemies.push({ x, y: -20, vx, vy, label, kind, hp });
+    };
+
+    const key = (e: KeyboardEvent, down: boolean) => {
+      if (e.key === "ArrowLeft" || e.key === "a") stateRef.keys.left = down;
+      if (e.key === "ArrowRight" || e.key === "d") stateRef.keys.right = down;
+      if (e.key === " " || e.key === "ArrowUp" || e.key === "w") {
+        stateRef.keys.fire = down;
+        if (down) e.preventDefault();
+      }
+    };
+    const kd = (e: KeyboardEvent) => key(e, true);
+    const ku = (e: KeyboardEvent) => key(e, false);
+    window.addEventListener("keydown", kd);
+    window.addEventListener("keyup", ku);
+
+    // Touch controls: tap left/right half to move; double-tap to fire
+    const onTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      const rect = c.getBoundingClientRect();
+      for (const t of Array.from(e.touches)) {
+        const px = t.clientX - rect.left;
+        const py = t.clientY - rect.top;
+        if (py < rect.height * 0.7) stateRef.keys.fire = true;
+        else if (px < rect.width / 2) {
+          stateRef.keys.left = true;
+          stateRef.keys.right = false;
+        } else {
+          stateRef.keys.right = true;
+          stateRef.keys.left = false;
+        }
+      }
+    };
+    const onTouchEnd = () => {
+      stateRef.keys.left = false;
+      stateRef.keys.right = false;
+      stateRef.keys.fire = false;
+    };
+    c.addEventListener("touchstart", onTouch, { passive: false });
+    c.addEventListener("touchmove", onTouch, { passive: false });
+    c.addEventListener("touchend", onTouchEnd);
+
+    let raf = 0;
+    let last = performance.now();
+
+    const boom = (x: number, y: number, color: string) => {
+      for (let i = 0; i < 12; i++) {
+        stateRef.particles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+          life: 30,
+          color,
+        });
+      }
+    };
+
+    const loop = (t: number) => {
+      const dt = Math.min(32, t - last);
+      last = t;
+      if (!stateRef.running) return;
+
+      // Update ship
+      const speed = 0.35 * dt;
+      if (stateRef.keys.left) stateRef.ship.x -= speed;
+      if (stateRef.keys.right) stateRef.ship.x += speed;
+      stateRef.ship.x = Math.max(20, Math.min(W - 20, stateRef.ship.x));
+
+      // Fire
+      if (stateRef.keys.fire && t - stateRef.lastShot > 220) {
+        stateRef.bullets.push({ x: stateRef.ship.x, y: stateRef.ship.y - 12 });
+        stateRef.lastShot = t;
+      }
+
+      // Bullets
+      stateRef.bullets = stateRef.bullets.filter((b) => b.y > -10);
+      for (const b of stateRef.bullets) b.y -= 0.6 * dt;
+
+      // Spawn
+      stateRef.spawnTimer -= dt;
+      const spawnRate = Math.max(320, 900 - stateRef.wave * 60);
+      if (stateRef.spawnTimer <= 0) {
+        spawn();
+        stateRef.spawnTimer = spawnRate;
+      }
+
+      // Move enemies
+      for (const en of stateRef.enemies) {
+        en.x += en.vx * dt * 0.3;
+        en.y += en.vy * dt * 0.3;
+        if (en.x < 15 || en.x > W - 15) en.vx *= -1;
+      }
+
+      // Collisions
+      const nextEnemies: typeof stateRef.enemies = [];
+      for (const en of stateRef.enemies) {
+        let hit = false;
+        for (let i = stateRef.bullets.length - 1; i >= 0; i--) {
+          const b = stateRef.bullets[i];
+          const w = 8 + en.label.length * 4;
+          if (Math.abs(b.x - en.x) < w && Math.abs(b.y - en.y) < 12) {
+            stateRef.bullets.splice(i, 1);
+            en.hp -= 1;
+            if (en.hp <= 0) {
+              hit = true;
+              if (en.kind === "good") {
+                stateRef.lives -= 1;
+                boom(en.x, en.y, "#f87171");
+                setLives(stateRef.lives);
+              } else {
+                stateRef.score += en.kind === "virus" ? 20 : 10;
+                boom(en.x, en.y, en.kind === "virus" ? "#a78bfa" : "#60a5fa");
+                setScore(stateRef.score);
+              }
+              break;
+            }
+          }
+        }
+        if (!hit) {
+          if (en.y > H - 30) {
+            if (en.kind === "good") {
+              stateRef.score += 5;
+              setScore(stateRef.score);
+            } else {
+              stateRef.lives -= 1;
+              setLives(stateRef.lives);
+              boom(en.x, H - 30, "#f87171");
+            }
+          } else {
+            nextEnemies.push(en);
+          }
+        }
+      }
+      stateRef.enemies = nextEnemies;
+
+      // Wave-up every 30 kills-worth of score
+      const newWave = 1 + Math.floor(stateRef.score / 120);
+      if (newWave !== stateRef.wave) {
+        stateRef.wave = newWave;
+        setWave(newWave);
+      }
+
+      // Particles
+      stateRef.particles = stateRef.particles.filter((p) => p.life > 0);
+      for (const p of stateRef.particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+      }
+
+      // Draw
+      ctx.fillStyle = "#05070f";
+      ctx.fillRect(0, 0, W, H);
+      // starfield
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 97 + (t * 0.05) % W) % W;
+        const sy = (i * 53 + (t * 0.08) % H) % H;
+        ctx.fillRect(sx, sy, 1, 1);
+      }
+
+      // ship
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.moveTo(stateRef.ship.x, stateRef.ship.y - 12);
+      ctx.lineTo(stateRef.ship.x - 14, stateRef.ship.y + 10);
+      ctx.lineTo(stateRef.ship.x + 14, stateRef.ship.y + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#0ea5e9";
+      ctx.fillRect(stateRef.ship.x - 4, stateRef.ship.y + 10, 8, 5);
+
+      // bullets
+      ctx.fillStyle = "#fde047";
+      for (const b of stateRef.bullets) ctx.fillRect(b.x - 1.5, b.y - 6, 3, 8);
+
+      // enemies
+      ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const en of stateRef.enemies) {
+        const w = 12 + en.label.length * 7;
+        const h = 20;
+        const color = en.kind === "good" ? "#22c55e" : en.kind === "virus" ? "#a78bfa" : "#f472b6";
+        ctx.fillStyle = color + "33";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(en.x - w / 2, en.y - h / 2, w, h, 4) : ctx.rect(en.x - w / 2, en.y - h / 2, w, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillText(en.label, en.x, en.y + 1);
+      }
+
+      // particles
+      for (const p of stateRef.particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / 30;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+
+      if (stateRef.lives <= 0) {
+        stateRef.running = false;
+        setRunning(false);
+        setEnded(true);
+        return;
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return () => {
+      stateRef.running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", kd);
+      window.removeEventListener("keyup", ku);
+      c.removeEventListener("touchstart", onTouch);
+      c.removeEventListener("touchmove", onTouch);
+      c.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [running, stateRef]);
+
+  const start = () => {
+    stateRef.ship.x = 200;
+    stateRef.bullets = [];
+    stateRef.enemies = [];
+    stateRef.particles = [];
+    stateRef.score = 0;
+    stateRef.lives = 3;
+    stateRef.wave = 1;
+    setScore(0);
+    setLives(3);
+    setWave(1);
+    setEnded(false);
+    setRunning(true);
+  };
+
+  const [claimed, setClaimed] = useState(false);
+  const xp = Math.min(200, Math.floor(score / 5));
+
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground mb-2">
+        Blast phishing 🎣 & viruses 🦠. Don't shoot green good-guys (HTTPS, 2FA, UPDATE)!
+      </div>
+      <div className="flex items-center justify-between mb-2 text-xs font-mono">
+        <div>SCORE: <span className="text-primary">{score}</span></div>
+        <div>WAVE: <span className="text-primary">{wave}</span></div>
+        <div>LIVES: <span className="text-destructive">{"❤".repeat(Math.max(0, lives))}</span></div>
+      </div>
+      <div className="relative rounded-lg overflow-hidden border border-primary/40 bg-[#05070f]">
+        <canvas
+          ref={(el) => nodeRef.set(el)}
+          width={400}
+          height={420}
+          className="w-full block touch-none"
+          style={{ imageRendering: "pixelated" }}
+        />
+        {!running && !ended && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white">
+            <div className="text-2xl font-black tracking-widest">CYBER SPACE SHOOTER</div>
+            <div className="text-xs opacity-80 text-center px-4">
+              ← → to move · SPACE to fire<br />Mobile: tap left/right side · tap top to fire
+            </div>
+            <Button onClick={start}>Insert Coin ▶</Button>
+          </div>
+        )}
+        {ended && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 text-white">
+            <div className="text-xl font-bold">GAME OVER</div>
+            <div className="text-sm">Final score: <span className="text-primary font-bold">{score}</span></div>
+            <div className="text-xs opacity-80">Earn {xp} XP for this run</div>
+            <div className="flex gap-2 mt-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!claimed && xp > 0) {
+                    onEarnXp(xp);
+                    setClaimed(true);
+                    toast.success(`+${xp} XP earned!`);
+                  }
+                }}
+                disabled={claimed || xp === 0}
+              >
+                {claimed ? "Claimed" : "Claim XP"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={start}>Play again</Button>
+              <Button size="sm" variant="ghost" onClick={onClose}>Done</Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

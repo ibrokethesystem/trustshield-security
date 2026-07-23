@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.7",
+    version: "2.0.7",
+    name: "CyberEdu: bigger quizzes + Cyber Space Shooter",
+    date: "2026-07-23",
+    summary:
+      "Every CyberEdu lesson now has 3-4 quiz questions instead of one, so kids get to practice more of what they just learned. Finishing the final 'When something feels off' lesson unlocks a brand-new retro arcade minigame: Cyber Space Shooter. Pilot the ship (← → and SPACE, or tap on mobile), blast phishing and virus words falling from space, and don't shoot the green good-guys (HTTPS, 2FA, UPDATE)!",
+  },
+  {
     id: "2.0.6",
     version: "2.0.6",
     name: "Version switcher hotfix",
