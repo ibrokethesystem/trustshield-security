@@ -1010,3 +1010,364 @@ function GameEnd({ score, total, onClose, onEarnXp }: { score: number; total: nu
     </div>
   );
 }
+// Retro arcade "Cyber Space Shooter" — shoot phishing/malware words before they reach your device.
+function SpaceShooter({ onEarnXp, onClose }: GameProps) {
+  const canvasRef = (typeof window !== "undefined") ? undefined : undefined;
+  const ref = (typeof window !== "undefined") ? undefined : undefined;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _ = canvasRef ?? ref;
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [wave, setWave] = useState(1);
+  const [running, setRunning] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const cRef = (globalThis as any).React ? undefined : undefined;
+  const canvas = (function useCanvasRef() {
+    // simple ref replacement via useState of node
+    return undefined;
+  })();
+  void canvas;
+  // Real refs
+  const nodeRef = (function () {
+    const [n, setN] = useState<HTMLCanvasElement | null>(null);
+    return { get: () => n, set: setN };
+  })();
+
+  const stateRef = useMemo(
+    () => ({
+      ship: { x: 200, y: 380, w: 34, h: 24 },
+      bullets: [] as { x: number; y: number }[],
+      enemies: [] as { x: number; y: number; vx: number; vy: number; label: string; kind: "phish" | "virus" | "good"; hp: number }[],
+      particles: [] as { x: number; y: number; vx: number; vy: number; life: number; color: string }[],
+      keys: { left: false, right: false, fire: false },
+      lastShot: 0,
+      spawnTimer: 0,
+      running: false,
+      score: 0,
+      lives: 3,
+      wave: 1,
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const c = nodeRef.get();
+    if (!c || !running) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const W = c.width;
+    const H = c.height;
+    stateRef.running = true;
+
+    const PHISH_WORDS = ["FREE!", "WIN$$$", "CLICK", "URGENT", "PRIZE", "GIFT", "VERIFY", "R0BUX", "L0GIN"];
+    const VIRUS_WORDS = ["VIRUS", "TROJAN", "SPYWARE", "MALWARE", "WORM"];
+    const GOOD_WORDS = ["HTTPS", "2FA", "UPDATE", "BACKUP", "PATCH"];
+
+    const spawn = () => {
+      const r = Math.random();
+      const kind = r < 0.55 ? "phish" : r < 0.85 ? "virus" : "good";
+      const pool = kind === "phish" ? PHISH_WORDS : kind === "virus" ? VIRUS_WORDS : GOOD_WORDS;
+      const label = pool[Math.floor(Math.random() * pool.length)];
+      const x = 20 + Math.random() * (W - 40);
+      const vy = 0.4 + Math.random() * 0.4 + stateRef.wave * 0.15;
+      const vx = (Math.random() - 0.5) * 0.6;
+      const hp = kind === "virus" ? 2 : 1;
+      stateRef.enemies.push({ x, y: -20, vx, vy, label, kind, hp });
+    };
+
+    const key = (e: KeyboardEvent, down: boolean) => {
+      if (e.key === "ArrowLeft" || e.key === "a") stateRef.keys.left = down;
+      if (e.key === "ArrowRight" || e.key === "d") stateRef.keys.right = down;
+      if (e.key === " " || e.key === "ArrowUp" || e.key === "w") {
+        stateRef.keys.fire = down;
+        if (down) e.preventDefault();
+      }
+    };
+    const kd = (e: KeyboardEvent) => key(e, true);
+    const ku = (e: KeyboardEvent) => key(e, false);
+    window.addEventListener("keydown", kd);
+    window.addEventListener("keyup", ku);
+
+    // Touch controls: tap left/right half to move; double-tap to fire
+    const onTouch = (e: TouchEvent) => {
+      e.preventDefault();
+      const rect = c.getBoundingClientRect();
+      for (const t of Array.from(e.touches)) {
+        const px = t.clientX - rect.left;
+        const py = t.clientY - rect.top;
+        if (py < rect.height * 0.7) stateRef.keys.fire = true;
+        else if (px < rect.width / 2) {
+          stateRef.keys.left = true;
+          stateRef.keys.right = false;
+        } else {
+          stateRef.keys.right = true;
+          stateRef.keys.left = false;
+        }
+      }
+    };
+    const onTouchEnd = () => {
+      stateRef.keys.left = false;
+      stateRef.keys.right = false;
+      stateRef.keys.fire = false;
+    };
+    c.addEventListener("touchstart", onTouch, { passive: false });
+    c.addEventListener("touchmove", onTouch, { passive: false });
+    c.addEventListener("touchend", onTouchEnd);
+
+    let raf = 0;
+    let last = performance.now();
+
+    const boom = (x: number, y: number, color: string) => {
+      for (let i = 0; i < 12; i++) {
+        stateRef.particles.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 4,
+          vy: (Math.random() - 0.5) * 4,
+          life: 30,
+          color,
+        });
+      }
+    };
+
+    const loop = (t: number) => {
+      const dt = Math.min(32, t - last);
+      last = t;
+      if (!stateRef.running) return;
+
+      // Update ship
+      const speed = 0.35 * dt;
+      if (stateRef.keys.left) stateRef.ship.x -= speed;
+      if (stateRef.keys.right) stateRef.ship.x += speed;
+      stateRef.ship.x = Math.max(20, Math.min(W - 20, stateRef.ship.x));
+
+      // Fire
+      if (stateRef.keys.fire && t - stateRef.lastShot > 220) {
+        stateRef.bullets.push({ x: stateRef.ship.x, y: stateRef.ship.y - 12 });
+        stateRef.lastShot = t;
+      }
+
+      // Bullets
+      stateRef.bullets = stateRef.bullets.filter((b) => b.y > -10);
+      for (const b of stateRef.bullets) b.y -= 0.6 * dt;
+
+      // Spawn
+      stateRef.spawnTimer -= dt;
+      const spawnRate = Math.max(320, 900 - stateRef.wave * 60);
+      if (stateRef.spawnTimer <= 0) {
+        spawn();
+        stateRef.spawnTimer = spawnRate;
+      }
+
+      // Move enemies
+      for (const en of stateRef.enemies) {
+        en.x += en.vx * dt * 0.3;
+        en.y += en.vy * dt * 0.3;
+        if (en.x < 15 || en.x > W - 15) en.vx *= -1;
+      }
+
+      // Collisions
+      const nextEnemies: typeof stateRef.enemies = [];
+      for (const en of stateRef.enemies) {
+        let hit = false;
+        for (let i = stateRef.bullets.length - 1; i >= 0; i--) {
+          const b = stateRef.bullets[i];
+          const w = 8 + en.label.length * 4;
+          if (Math.abs(b.x - en.x) < w && Math.abs(b.y - en.y) < 12) {
+            stateRef.bullets.splice(i, 1);
+            en.hp -= 1;
+            if (en.hp <= 0) {
+              hit = true;
+              if (en.kind === "good") {
+                stateRef.lives -= 1;
+                boom(en.x, en.y, "#f87171");
+                setLives(stateRef.lives);
+              } else {
+                stateRef.score += en.kind === "virus" ? 20 : 10;
+                boom(en.x, en.y, en.kind === "virus" ? "#a78bfa" : "#60a5fa");
+                setScore(stateRef.score);
+              }
+              break;
+            }
+          }
+        }
+        if (!hit) {
+          if (en.y > H - 30) {
+            if (en.kind === "good") {
+              stateRef.score += 5;
+              setScore(stateRef.score);
+            } else {
+              stateRef.lives -= 1;
+              setLives(stateRef.lives);
+              boom(en.x, H - 30, "#f87171");
+            }
+          } else {
+            nextEnemies.push(en);
+          }
+        }
+      }
+      stateRef.enemies = nextEnemies;
+
+      // Wave-up every 30 kills-worth of score
+      const newWave = 1 + Math.floor(stateRef.score / 120);
+      if (newWave !== stateRef.wave) {
+        stateRef.wave = newWave;
+        setWave(newWave);
+      }
+
+      // Particles
+      stateRef.particles = stateRef.particles.filter((p) => p.life > 0);
+      for (const p of stateRef.particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+      }
+
+      // Draw
+      ctx.fillStyle = "#05070f";
+      ctx.fillRect(0, 0, W, H);
+      // starfield
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      for (let i = 0; i < 40; i++) {
+        const sx = (i * 97 + (t * 0.05) % W) % W;
+        const sy = (i * 53 + (t * 0.08) % H) % H;
+        ctx.fillRect(sx, sy, 1, 1);
+      }
+
+      // ship
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.moveTo(stateRef.ship.x, stateRef.ship.y - 12);
+      ctx.lineTo(stateRef.ship.x - 14, stateRef.ship.y + 10);
+      ctx.lineTo(stateRef.ship.x + 14, stateRef.ship.y + 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#0ea5e9";
+      ctx.fillRect(stateRef.ship.x - 4, stateRef.ship.y + 10, 8, 5);
+
+      // bullets
+      ctx.fillStyle = "#fde047";
+      for (const b of stateRef.bullets) ctx.fillRect(b.x - 1.5, b.y - 6, 3, 8);
+
+      // enemies
+      ctx.font = "bold 11px ui-monospace, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const en of stateRef.enemies) {
+        const w = 12 + en.label.length * 7;
+        const h = 20;
+        const color = en.kind === "good" ? "#22c55e" : en.kind === "virus" ? "#a78bfa" : "#f472b6";
+        ctx.fillStyle = color + "33";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.roundRect ? ctx.roundRect(en.x - w / 2, en.y - h / 2, w, h, 4) : ctx.rect(en.x - w / 2, en.y - h / 2, w, h);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillText(en.label, en.x, en.y + 1);
+      }
+
+      // particles
+      for (const p of stateRef.particles) {
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life / 30;
+        ctx.fillRect(p.x, p.y, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+
+      if (stateRef.lives <= 0) {
+        stateRef.running = false;
+        setRunning(false);
+        setEnded(true);
+        return;
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+
+    return () => {
+      stateRef.running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", kd);
+      window.removeEventListener("keyup", ku);
+      c.removeEventListener("touchstart", onTouch);
+      c.removeEventListener("touchmove", onTouch);
+      c.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [running, stateRef]);
+
+  const start = () => {
+    stateRef.ship.x = 200;
+    stateRef.bullets = [];
+    stateRef.enemies = [];
+    stateRef.particles = [];
+    stateRef.score = 0;
+    stateRef.lives = 3;
+    stateRef.wave = 1;
+    setScore(0);
+    setLives(3);
+    setWave(1);
+    setEnded(false);
+    setRunning(true);
+  };
+
+  const [claimed, setClaimed] = useState(false);
+  const xp = Math.min(200, Math.floor(score / 5));
+
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground mb-2">
+        Blast phishing 🎣 & viruses 🦠. Don't shoot green good-guys (HTTPS, 2FA, UPDATE)!
+      </div>
+      <div className="flex items-center justify-between mb-2 text-xs font-mono">
+        <div>SCORE: <span className="text-primary">{score}</span></div>
+        <div>WAVE: <span className="text-primary">{wave}</span></div>
+        <div>LIVES: <span className="text-destructive">{"❤".repeat(Math.max(0, lives))}</span></div>
+      </div>
+      <div className="relative rounded-lg overflow-hidden border border-primary/40 bg-[#05070f]">
+        <canvas
+          ref={(el) => nodeRef.set(el)}
+          width={400}
+          height={420}
+          className="w-full block touch-none"
+          style={{ imageRendering: "pixelated" }}
+        />
+        {!running && !ended && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-white">
+            <div className="text-2xl font-black tracking-widest">CYBER SPACE SHOOTER</div>
+            <div className="text-xs opacity-80 text-center px-4">
+              ← → to move · SPACE to fire<br />Mobile: tap left/right side · tap top to fire
+            </div>
+            <Button onClick={start}>Insert Coin ▶</Button>
+          </div>
+        )}
+        {ended && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 text-white">
+            <div className="text-xl font-bold">GAME OVER</div>
+            <div className="text-sm">Final score: <span className="text-primary font-bold">{score}</span></div>
+            <div className="text-xs opacity-80">Earn {xp} XP for this run</div>
+            <div className="flex gap-2 mt-2">
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (!claimed && xp > 0) {
+                    onEarnXp(xp);
+                    setClaimed(true);
+                    toast.success(`+${xp} XP earned!`);
+                  }
+                }}
+                disabled={claimed || xp === 0}
+              >
+                {claimed ? "Claimed" : "Claim XP"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={start}>Play again</Button>
+              <Button size="sm" variant="ghost" onClick={onClose}>Done</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
