@@ -15,6 +15,7 @@ type Lesson = {
   sections?: Section[];
   tryThis?: string[];
   quiz: Quiz;
+  quizzes?: Quiz[];
   unlocksGame?: MiniGameKey;
 };
 type MiniGameKey = "phish-or-legit" | "password-power" | "link-detective" | "space-shooter";
