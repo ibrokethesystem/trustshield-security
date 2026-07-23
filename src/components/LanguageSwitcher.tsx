@@ -83,7 +83,18 @@ const collectAttrTargets = (root: ParentNode) => {
 
 const attrOriginals = new WeakMap<Element, Record<string, string>>();
 
-let inflight = false;
+// Serialize apply runs so callers can await the *actual* completion, and
+// so the "Translating…" indicator stays on for the full duration (including
+// any queued re-run triggered by DOM mutations during translation).
+let currentRun: Promise<void> = Promise.resolve();
+let pendingTarget: string | null = null;
+const busyListeners = new Set<(b: boolean) => void>();
+let busyCount = 0;
+const setGlobalBusy = (delta: number) => {
+  busyCount = Math.max(0, busyCount + delta);
+  const b = busyCount > 0;
+  busyListeners.forEach((fn) => fn(b));
+};
 
 async function translateBatch(strings: string[], target: string): Promise<Record<string, string>> {
   if (!strings.length) return {};
@@ -93,7 +104,7 @@ async function translateBatch(strings: string[], target: string): Promise<Record
 
   // Smaller chunks + parallel dispatch = much lower wall-clock latency.
   const chunks: string[][] = [];
-  for (let i = 0; i < need.length; i += 40) chunks.push(need.slice(i, i + 40));
+  for (let i = 0; i < need.length; i += 30) chunks.push(need.slice(i, i + 30));
   await Promise.all(
     chunks.map(async (chunk) => {
       try {
@@ -117,9 +128,8 @@ async function translateBatch(strings: string[], target: string): Promise<Record
   return langCache;
 }
 
-async function applyLanguage(target: string) {
-  if (inflight) return;
-  inflight = true;
+async function applyLanguageInner(target: string) {
+  setGlobalBusy(+1);
   try {
     // 1. Record originals for any nodes we haven't seen yet.
     const textNodes = collectTextNodes(document.body);
@@ -172,8 +182,22 @@ async function applyLanguage(target: string) {
       if (t && el.getAttribute(attr) !== t) el.setAttribute(attr, t);
     });
   } finally {
-    inflight = false;
+    setGlobalBusy(-1);
   }
+}
+
+function applyLanguage(target: string): Promise<void> {
+  // Coalesce concurrent requests: if a run is in-flight, remember the latest
+  // target and chain a single follow-up run after it finishes.
+  pendingTarget = target;
+  const next = currentRun.then(async () => {
+    const t = pendingTarget;
+    pendingTarget = null;
+    if (t == null) return;
+    await applyLanguageInner(t);
+  });
+  currentRun = next.catch(() => {});
+  return next;
 }
 
 export const LanguageSwitcher = () => {
@@ -184,9 +208,15 @@ export const LanguageSwitcher = () => {
   const debounceRef = useRef<number | null>(null);
 
   const runApply = useCallback(async (target: string) => {
-    setBusy(true);
     await applyLanguage(target);
-    setBusy(false);
+  }, []);
+
+  // Subscribe to global busy state so the label stays "Translating…" for the
+  // full duration, even across queued re-runs from DOM mutations.
+  useEffect(() => {
+    const fn = (b: boolean) => setBusy(b);
+    busyListeners.add(fn);
+    return () => { busyListeners.delete(fn); };
   }, []);
 
   // Re-apply on DOM mutations (new content, route changes, dialogs, toasts).
