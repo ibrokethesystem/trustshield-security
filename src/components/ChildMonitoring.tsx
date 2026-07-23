@@ -24,6 +24,33 @@ function normalizeHost(input: string) {
 
 export function ChildMonitoring({ parentUserId }: { parentUserId: string | undefined }) {
   const [links, setLinks] = useState<ChildLink[]>([]);
+  const [showGamesToggle, setShowGamesToggle] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const cmp = (a: string, b: string) => {
+      const pa = a.split(".").map(Number); const pb = b.split(".").map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+      }
+      return 0;
+    };
+    const v = localStorage.getItem("ts_active_version") || "2.0.8";
+    return cmp(v, "2.0.8") >= 0;
+  });
+  useEffect(() => {
+    const update = () => {
+      const cmp = (a: string, b: string) => {
+        const pa = a.split(".").map(Number); const pb = b.split(".").map(Number);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+        }
+        return 0;
+      };
+      const v = localStorage.getItem("ts_active_version") || "2.0.8";
+      setShowGamesToggle(cmp(v, "2.0.8") >= 0);
+    };
+    window.addEventListener("ts:version-change", update);
+    return () => window.removeEventListener("ts:version-change", update);
+  }, []);
   const [selected, setSelected] = useState<string | null>(null);
   const [activity, setActivity] = useState<Activity[]>([]);
   const [bans, setBans] = useState<Ban[]>([]);
@@ -318,15 +345,17 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
                 >
                   {selectedLink.edu_disabled ? "Turn CyberEdu on" : "Turn CyberEdu off"}
                 </Button>
-                <Button
-                  variant={selectedLink.edu_games_disabled ? "default" : "outline"}
-                  size="sm"
-                  disabled={selectedLink.edu_disabled}
-                  onClick={() => toggleEduGames(selectedLink.child_id, !selectedLink.edu_games_disabled)}
-                  title={selectedLink.edu_disabled ? "CyberEdu is already fully off" : undefined}
-                >
-                  {selectedLink.edu_games_disabled ? "Turn CyberEdu games on" : "Turn CyberEdu games off"}
-                </Button>
+                {showGamesToggle && (
+                  <Button
+                    variant={selectedLink.edu_games_disabled ? "default" : "outline"}
+                    size="sm"
+                    disabled={selectedLink.edu_disabled}
+                    onClick={() => toggleEduGames(selectedLink.child_id, !selectedLink.edu_games_disabled)}
+                    title={selectedLink.edu_disabled ? "CyberEdu is already fully off" : undefined}
+                  >
+                    {selectedLink.edu_games_disabled ? "Turn CyberEdu games on" : "Turn CyberEdu games off"}
+                  </Button>
+                )}
               </div>
             </div>
           )}
