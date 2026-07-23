@@ -1070,7 +1070,7 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
       const vy = 0.35 + Math.random() * 0.3 + stateRef.wave * 0.12;
       const vx = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6);
       const hp = kind === "virus" ? 2 : 1;
-      const size = kind === "virus" ? 22 : 18;
+      const size = kind === "virus" ? 14 : 12;
       (stateRef.enemies as any).push({ x, y: -20, vx, vy, label, kind, hp, size, phase: Math.random() * Math.PI * 2 });
     };
 
@@ -1167,14 +1167,15 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
         if (en.x > W - 20) { en.x = W - 20; en.vx = -Math.abs(en.vx); }
       }
 
-      // Collisions
+      // Collisions — hitbox matches the actual rendered sprite (9 cells * pixel size)
       const nextEnemies: typeof stateRef.enemies = [];
       for (const en of stateRef.enemies as any[]) {
         let hit = false;
+        const spriteS = Math.max(2, Math.round((en.size ?? 14) / 4));
+        const halfBox = (9 * spriteS) / 2 + 2; // full sprite coverage + tiny forgiveness
         for (let i = stateRef.bullets.length - 1; i >= 0; i--) {
           const b = stateRef.bullets[i];
-          const r = en.size ?? 18;
-          if (Math.abs(b.x - en.x) < r && Math.abs(b.y - en.y) < r) {
+          if (Math.abs(b.x - en.x) < halfBox && Math.abs(b.y - en.y) < halfBox) {
             stateRef.bullets.splice(i, 1);
             en.hp -= 1;
             if (en.hp <= 0) {
