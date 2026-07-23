@@ -1059,20 +1059,17 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
     const H = c.height;
     stateRef.running = true;
 
-    const PHISH_WORDS = ["FREE!", "WIN$$$", "CLICK", "URGENT", "PRIZE", "GIFT", "VERIFY", "R0BUX", "L0GIN"];
-    const VIRUS_WORDS = ["VIRUS", "TROJAN", "SPYWARE", "MALWARE", "WORM"];
-    const GOOD_WORDS = ["HTTPS", "2FA", "UPDATE", "BACKUP", "PATCH"];
+    const VIRUS_WORDS = ["VIRUS", "TROJAN", "WORM", "SPYWARE", "MALWARE", "BOTNET", "RANSOM"];
 
     const spawn = () => {
-      const r = Math.random();
-      const kind = r < 0.55 ? "phish" : r < 0.85 ? "virus" : "good";
-      const pool = kind === "phish" ? PHISH_WORDS : kind === "virus" ? VIRUS_WORDS : GOOD_WORDS;
-      const label = pool[Math.floor(Math.random() * pool.length)];
-      const x = 20 + Math.random() * (W - 40);
-      const vy = 0.4 + Math.random() * 0.4 + stateRef.wave * 0.15;
-      const vx = (Math.random() - 0.5) * 0.6;
+      const kind: "phish" | "virus" = Math.random() < 0.5 ? "phish" : "virus";
+      const label = VIRUS_WORDS[Math.floor(Math.random() * VIRUS_WORDS.length)];
+      const x = 30 + Math.random() * (W - 60);
+      const vy = 0.35 + Math.random() * 0.3 + stateRef.wave * 0.12;
+      const vx = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6);
       const hp = kind === "virus" ? 2 : 1;
-      stateRef.enemies.push({ x, y: -20, vx, vy, label, kind, hp });
+      const size = kind === "virus" ? 22 : 18;
+      (stateRef.enemies as any).push({ x, y: -20, vx, vy, label, kind, hp, size, phase: Math.random() * Math.PI * 2 });
     };
 
     const key = (e: KeyboardEvent, down: boolean) => {
@@ -1159,48 +1156,39 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
         stateRef.spawnTimer = spawnRate;
       }
 
-      // Move enemies
-      for (const en of stateRef.enemies) {
-        en.x += en.vx * dt * 0.3;
+      // Move enemies — sine-wave drift + bounce off walls
+      for (const en of stateRef.enemies as any[]) {
+        en.phase += dt * 0.005;
+        en.x += en.vx * dt * 0.3 + Math.sin(en.phase) * 0.6;
         en.y += en.vy * dt * 0.3;
-        if (en.x < 15 || en.x > W - 15) en.vx *= -1;
+        if (en.x < 20) { en.x = 20; en.vx = Math.abs(en.vx); }
+        if (en.x > W - 20) { en.x = W - 20; en.vx = -Math.abs(en.vx); }
       }
 
       // Collisions
       const nextEnemies: typeof stateRef.enemies = [];
-      for (const en of stateRef.enemies) {
+      for (const en of stateRef.enemies as any[]) {
         let hit = false;
         for (let i = stateRef.bullets.length - 1; i >= 0; i--) {
           const b = stateRef.bullets[i];
-          const w = 8 + en.label.length * 4;
-          if (Math.abs(b.x - en.x) < w && Math.abs(b.y - en.y) < 12) {
+          const r = en.size ?? 18;
+          if (Math.abs(b.x - en.x) < r && Math.abs(b.y - en.y) < r) {
             stateRef.bullets.splice(i, 1);
             en.hp -= 1;
             if (en.hp <= 0) {
               hit = true;
-              if (en.kind === "good") {
-                stateRef.lives -= 1;
-                boom(en.x, en.y, "#f87171");
-                setLives(stateRef.lives);
-              } else {
-                stateRef.score += en.kind === "virus" ? 20 : 10;
-                boom(en.x, en.y, en.kind === "virus" ? "#a78bfa" : "#60a5fa");
-                setScore(stateRef.score);
-              }
+              stateRef.score += en.kind === "virus" ? 20 : 10;
+              boom(en.x, en.y, en.kind === "virus" ? "#a78bfa" : "#f472b6");
+              setScore(stateRef.score);
               break;
             }
           }
         }
         if (!hit) {
           if (en.y > H - 30) {
-            if (en.kind === "good") {
-              stateRef.score += 5;
-              setScore(stateRef.score);
-            } else {
-              stateRef.lives -= 1;
-              setLives(stateRef.lives);
-              boom(en.x, H - 30, "#f87171");
-            }
+            stateRef.lives -= 1;
+            setLives(stateRef.lives);
+            boom(en.x, H - 30, "#f87171");
           } else {
             nextEnemies.push(en);
           }
@@ -1234,38 +1222,16 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
         ctx.fillRect(sx, sy, 1, 1);
       }
 
-      // ship
-      ctx.fillStyle = "#38bdf8";
-      ctx.beginPath();
-      ctx.moveTo(stateRef.ship.x, stateRef.ship.y - 12);
-      ctx.lineTo(stateRef.ship.x - 14, stateRef.ship.y + 10);
-      ctx.lineTo(stateRef.ship.x + 14, stateRef.ship.y + 10);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = "#0ea5e9";
-      ctx.fillRect(stateRef.ship.x - 4, stateRef.ship.y + 10, 8, 5);
+      // ship — pixel-art texture drawn cell-by-cell
+      drawShip(ctx, stateRef.ship.x, stateRef.ship.y, t);
 
       // bullets
       ctx.fillStyle = "#fde047";
       for (const b of stateRef.bullets) ctx.fillRect(b.x - 1.5, b.y - 6, 3, 8);
 
-      // enemies
-      ctx.font = "bold 11px ui-monospace, Menlo, monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      for (const en of stateRef.enemies) {
-        const w = 12 + en.label.length * 7;
-        const h = 20;
-        const color = en.kind === "good" ? "#22c55e" : en.kind === "virus" ? "#a78bfa" : "#f472b6";
-        ctx.fillStyle = color + "33";
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect ? ctx.roundRect(en.x - w / 2, en.y - h / 2, w, h, 4) : ctx.rect(en.x - w / 2, en.y - h / 2, w, h);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = color;
-        ctx.fillText(en.label, en.x, en.y + 1);
+      // enemies — retro pixel virus sprites
+      for (const en of stateRef.enemies as any[]) {
+        drawVirus(ctx, en.x, en.y, en.size ?? 18, en.kind, t + en.phase * 200);
       }
 
       // particles
@@ -1285,6 +1251,100 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
 
       raf = requestAnimationFrame(loop);
     };
+
+    // ==== pixel-art sprite helpers ====
+    const px = (cx: number, cy: number, s: number, grid: string[], palette: Record<string, string>) => {
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const ox = cx - (cols * s) / 2;
+      const oy = cy - (rows * s) / 2;
+      for (let r = 0; r < rows; r++) {
+        for (let cc = 0; cc < cols; cc++) {
+          const ch = grid[r][cc];
+          const col = palette[ch];
+          if (!col) continue;
+          ctx.fillStyle = col;
+          ctx.fillRect(Math.round(ox + cc * s), Math.round(oy + r * s), s, s);
+        }
+      }
+    };
+
+    const SHIP = [
+      "....W....",
+      "....W....",
+      "...WBW...",
+      "...WBW...",
+      "..WBCBW..",
+      ".WBCCCBW.",
+      "WBBCCCBBW",
+      "WBCCACCBW",
+      "W.BCACB.W",
+      "..R.A.R..",
+      "..O...O..",
+    ];
+    const SHIP_PAL: Record<string, string> = {
+      W: "#e2e8f0", // hull highlight
+      B: "#38bdf8", // hull mid
+      C: "#0ea5e9", // hull deep
+      A: "#0f172a", // cockpit shadow
+      R: "#f97316", // thruster ring
+      O: "#fde047", // flame
+    };
+
+    function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, t: number) {
+      // flicker flame frame
+      const flame = Math.floor(t / 60) % 2 === 0 ? "#fde047" : "#f97316";
+      const pal = { ...SHIP_PAL, O: flame };
+      px(x, y - 2, 3, SHIP, pal);
+    }
+
+    const VIRUS_A = [
+      "..GG.GG..",
+      ".G.G.G.G.",
+      "GGVVVVVGG",
+      "G.VDWDV.G",
+      "GVVDWDVVG",
+      "G.VDWDV.G",
+      "GGVVVVVGG",
+      ".G.G.G.G.",
+      "..GG.GG..",
+    ];
+    const VIRUS_B = [
+      "P.P.P.P.P",
+      ".PPPPPPP.",
+      "PVVVKVVVP",
+      "PVKKKKKVP",
+      "PVKWAWKVP",
+      "PVKKKKKVP",
+      "PVVVKVVVP",
+      ".PPPPPPP.",
+      "P.P.P.P.P",
+    ];
+    const VIRUS_PAL_PHISH: Record<string, string> = {
+      G: "#22c55e",
+      V: "#16a34a",
+      D: "#052e16",
+      W: "#f0fdf4",
+    };
+    const VIRUS_PAL_VIRUS: Record<string, string> = {
+      P: "#c084fc",
+      V: "#7c3aed",
+      K: "#4c1d95",
+      W: "#f5f3ff",
+      A: "#000000",
+    };
+
+    function drawVirus(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, kind: string, t: number) {
+      const frame = Math.floor(t / 180) % 2;
+      const grid = kind === "virus" ? VIRUS_B : VIRUS_A;
+      const pal = kind === "virus" ? VIRUS_PAL_VIRUS : VIRUS_PAL_PHISH;
+      const s = Math.max(2, Math.round(size / 4));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(frame === 0 ? 0.08 : -0.08);
+      px(0, 0, s, grid, pal);
+      ctx.restore();
+    }
     raf = requestAnimationFrame(loop);
 
     return () => {
@@ -1319,7 +1379,7 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
   return (
     <div>
       <div className="text-xs text-muted-foreground mb-2">
-        Blast phishing 🎣 & viruses 🦠. Don't shoot green good-guys (HTTPS, 2FA, UPDATE)!
+        Blast every virus 🦠 before it reaches your device. Don't let any slip past!
       </div>
       <div className="flex items-center justify-between mb-2 text-xs font-mono">
         <div>SCORE: <span className="text-primary">{score}</span></div>
