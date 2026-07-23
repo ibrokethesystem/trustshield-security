@@ -686,14 +686,22 @@ function Stat({ label, value, icon }: { label: string; value: string; icon: Reac
 }
 
 function gameName(g: MiniGameKey) {
-  return g === "phish-or-legit" ? "Phish or Legit" : g === "password-power" ? "Password Power" : "Link Detective";
+  return g === "phish-or-legit"
+    ? "Phish or Legit"
+    : g === "password-power"
+      ? "Password Power"
+      : g === "link-detective"
+        ? "Link Detective"
+        : "Cyber Space Shooter";
 }
 function gameBlurb(g: MiniGameKey) {
   return g === "phish-or-legit"
     ? "Swipe fake vs. real emails."
     : g === "password-power"
       ? "Rank passwords from weak to strong."
-      : "Spot the sneaky URL.";
+      : g === "link-detective"
+        ? "Spot the sneaky URL."
+        : "Blast phishing bugs & viruses. Retro arcade!";
 }
 
 function LessonModal({ lesson, onClose, onComplete }: { lesson: Lesson; onClose: () => void; onComplete: () => void }) {
