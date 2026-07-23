@@ -91,29 +91,28 @@ async function translateBatch(strings: string[], target: string): Promise<Record
   const need = Array.from(new Set(strings.filter((s) => !(s in langCache))));
   if (need.length === 0) return langCache;
 
-  // Chunk to keep payload sane.
+  // Smaller chunks + parallel dispatch = much lower wall-clock latency.
   const chunks: string[][] = [];
-  for (let i = 0; i < need.length; i += 80) chunks.push(need.slice(i, i + 80));
-  for (const chunk of chunks) {
-    try {
-      const { data, error } = await supabase.functions.invoke("translate-text", {
-        body: { texts: chunk, target: NAME[target] || target },
-      });
-      if (error) throw error;
-      const translations: string[] = data?.translations || [];
-      chunk.forEach((src, i) => {
-        const t = translations[i];
-        // Only cache real translations. Never store the English source as a
-        // "translation" — that would poison the cache and stop future retries.
-        if (typeof t === "string" && t.trim() && t.trim() !== src.trim()) {
-          langCache[src] = t;
-        }
-      });
-    } catch (err) {
-      console.error("translate chunk failed", err);
-      // Do NOT cache failures — let the next apply retry them.
-    }
-  }
+  for (let i = 0; i < need.length; i += 40) chunks.push(need.slice(i, i + 40));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const { data, error } = await supabase.functions.invoke("translate-text", {
+          body: { texts: chunk, target: NAME[target] || target },
+        });
+        if (error) throw error;
+        const translations: string[] = data?.translations || [];
+        chunk.forEach((src, i) => {
+          const t = translations[i];
+          if (typeof t === "string" && t.trim() && t.trim() !== src.trim()) {
+            langCache[src] = t;
+          }
+        });
+      } catch (err) {
+        console.error("translate chunk failed", err);
+      }
+    }),
+  );
   persistCache();
   return langCache;
 }
@@ -195,7 +194,7 @@ export const LanguageSwitcher = () => {
     const scheduleReapply = () => {
       if (lang === "en") return; // English == source, no work needed
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
-      debounceRef.current = window.setTimeout(() => runApply(lang), 250);
+      debounceRef.current = window.setTimeout(() => runApply(lang), 120);
     };
     const obs = new MutationObserver(scheduleReapply);
     obs.observe(document.body, { childList: true, subtree: true, characterData: true });
