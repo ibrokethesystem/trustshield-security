@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.8",
+    version: "2.0.8",
+    name: "Parents can turn CyberEdu games off separately",
+    date: "2026-07-23",
+    summary:
+      "Family monitoring now has a second button next to \"Turn CyberEdu off\" called \"Turn CyberEdu games off.\" It hides only the mini-games section (Cyber Space Shooter, Phish or Legit, etc.) from the linked child's CyberEdu tab while keeping the lessons and quizzes available. The original \"Turn CyberEdu off\" button still hides the whole tab.",
+  },
+  {
     id: "2.0.7",
     version: "2.0.7",
     name: "CyberEdu: bigger quizzes + Cyber Space Shooter",
@@ -368,6 +376,7 @@ const Index = () => {
   const [role, setRole] = useState<Role>("solo");
   const [parentEmail, setParentEmail] = useState<string>("");
   const [eduDisabled, setEduDisabled] = useState<boolean>(false);
+  const [eduGamesDisabled, setEduGamesDisabled] = useState<boolean>(false);
   const [familyAlerts, setFamilyAlerts] = useState<
     { id: string; child_email: string; title: string; severity: string; created_at: string; summary?: string }[]
   >([]);
@@ -620,16 +629,19 @@ const Index = () => {
 
   // Children: watch the parent-controlled CyberEdu switch on child_links.
   useEffect(() => {
-    if (!user || role !== "child") { setEduDisabled(false); return; }
+    if (!user || role !== "child") { setEduDisabled(false); setEduGamesDisabled(false); return; }
     let cancelled = false;
     const load = async () => {
       const { data } = await supabase
         .from("child_links")
-        .select("edu_disabled")
+        .select("edu_disabled,edu_games_disabled")
         .eq("child_id", user.id)
         .is("deleted_at", null)
         .maybeSingle();
-      if (!cancelled) setEduDisabled(!!data?.edu_disabled);
+      if (!cancelled) {
+        setEduDisabled(!!data?.edu_disabled);
+        setEduGamesDisabled(!!(data as { edu_games_disabled?: boolean } | null)?.edu_games_disabled);
+      }
     };
     load();
     const channel = supabase
@@ -638,8 +650,9 @@ const Index = () => {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "child_links", filter: `child_id=eq.${user.id}` },
         (payload) => {
-          const row = payload.new as { edu_disabled?: boolean };
+          const row = payload.new as { edu_disabled?: boolean; edu_games_disabled?: boolean };
           setEduDisabled(!!row.edu_disabled);
+          setEduGamesDisabled(!!row.edu_games_disabled);
         },
       )
       .subscribe();
@@ -1734,7 +1747,7 @@ const Index = () => {
             }}
           />
         ) : view === "cyberedu" ? (
-          <CyberEduView userId={user?.id} />
+          <CyberEduView userId={user?.id} gamesDisabled={role === "child" && eduGamesDisabled} />
         ) : view === "myparent" ? (
           <MyParentView
             parentEmail={parentEmail}

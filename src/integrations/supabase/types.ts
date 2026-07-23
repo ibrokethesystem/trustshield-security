@@ -72,6 +72,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           edu_disabled: boolean
+          edu_games_disabled: boolean
           id: string
           label: string | null
           parent_id: string
@@ -82,6 +83,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edu_disabled?: boolean
+          edu_games_disabled?: boolean
           id?: string
           label?: string | null
           parent_id: string
@@ -92,6 +94,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edu_disabled?: boolean
+          edu_games_disabled?: boolean
           id?: string
           label?: string | null
           parent_id?: string

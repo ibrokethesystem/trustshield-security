@@ -516,7 +516,7 @@ const LESSONS: Lesson[] = [
   },
 ];
 
-export default function CyberEduView({ userId }: { userId?: string }) {
+export default function CyberEduView({ userId, gamesDisabled = false }: { userId?: string; gamesDisabled?: boolean }) {
   const storageKey = useMemo(() => `ts_cyberedu_${userId ?? "anon"}`, [userId]);
   const [progress, setProgress] = useState<{ completed: string[]; xp: number; games: MiniGameKey[] }>(() => {
     try {
@@ -636,6 +636,7 @@ export default function CyberEduView({ userId }: { userId?: string }) {
         </ul>
       </div>
 
+      {!gamesDisabled && (
       <div className="bg-card border border-border rounded-2xl p-5">
         <h3 className="font-semibold mb-3 flex items-center gap-2">
           <Gamepad2 className="w-4 h-4 text-primary" />
@@ -663,6 +664,7 @@ export default function CyberEduView({ userId }: { userId?: string }) {
           </div>
         )}
       </div>
+      )}
 
       {activeLesson && (
         <LessonModal
@@ -671,7 +673,7 @@ export default function CyberEduView({ userId }: { userId?: string }) {
           onComplete={() => completeLesson(activeLesson)}
         />
       )}
-      {activeGame && <MiniGameModal game={activeGame} onClose={() => setActiveGame(null)} onEarnXp={(n) => setProgress((p) => ({ ...p, xp: p.xp + n }))} />}
+      {activeGame && !gamesDisabled && <MiniGameModal game={activeGame} onClose={() => setActiveGame(null)} onEarnXp={(n) => setProgress((p) => ({ ...p, xp: p.xp + n }))} />}
     </div>
   );
 }
