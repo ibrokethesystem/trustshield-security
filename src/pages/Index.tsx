@@ -265,7 +265,7 @@ const navItems: {
 }[] = [
   { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { key: "guardian", label: "Cyber Guardian", icon: Sparkles },
-  { key: "family", label: "Family", icon: Users, parentOnly: true },
+  { key: "family", label: "Family", icon: Users, parentOnly: true, minVersion: "2.0.0" },
   { key: "cyberedu", label: "CyberEdu", icon: GraduationCap, childOnly: true, minVersion: "2.0.0" },
   { key: "myparent", label: "My parent", icon: User, childOnly: true, minVersion: "2.0.0" },
   { key: "passwords", label: "Passwords", icon: KeyRound, hideForChild: true },
@@ -1459,7 +1459,7 @@ const Index = () => {
               />
             </div>
 
-            {role !== "child" && (
+            {role !== "child" && hasFeature("2.0.0") && (
               <Card>
                 <div className="flex items-center gap-3 flex-wrap">
                   <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center shrink-0">
