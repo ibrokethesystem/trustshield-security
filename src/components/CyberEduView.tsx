@@ -1379,7 +1379,7 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
   return (
     <div>
       <div className="text-xs text-muted-foreground mb-2">
-        Blast phishing 🎣 & viruses 🦠. Don't shoot green good-guys (HTTPS, 2FA, UPDATE)!
+        Blast every virus 🦠 before it reaches your device. Don't let any slip past!
       </div>
       <div className="flex items-center justify-between mb-2 text-xs font-mono">
         <div>SCORE: <span className="text-primary">{score}</span></div>
