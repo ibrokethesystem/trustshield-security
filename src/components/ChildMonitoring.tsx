@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Shield, Ban, Globe, Trash2, RefreshCw, Link2, Users, Eraser, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 
-type ChildLink = { child_id: string; child_email: string | null; edu_disabled: boolean };
+type ChildLink = { child_id: string; child_email: string | null; edu_disabled: boolean; edu_games_disabled: boolean };
 type Activity = { id: string; host: string; url: string; risk: number; blocked: boolean; created_at: string };
 type Ban = { id: string; host: string; created_at: string };
 type ChildStats = { activity: number; bans: number; lastSeen: string | null };
@@ -37,7 +37,7 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
     if (!parentUserId) return;
     const { data, error } = await supabase
       .from("child_links")
-      .select("child_id,child_email,edu_disabled")
+      .select("child_id,child_email,edu_disabled,edu_games_disabled")
       .eq("parent_id", parentUserId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true });
@@ -188,6 +188,18 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
     toast.success(disable ? "CyberEdu turned off for this child" : "CyberEdu turned on for this child");
   };
 
+  const toggleEduGames = async (childId: string, disable: boolean) => {
+    if (!parentUserId) return;
+    const { error } = await supabase
+      .from("child_links")
+      .update({ edu_games_disabled: disable })
+      .eq("parent_id", parentUserId)
+      .eq("child_id", childId);
+    if (error) return toast.error("Couldn't update CyberEdu games access", { description: error.message });
+    setLinks((prev) => prev.map((l) => (l.child_id === childId ? { ...l, edu_games_disabled: disable } : l)));
+    toast.success(disable ? "CyberEdu games turned off for this child" : "CyberEdu games turned on for this child");
+  };
+
   const selectedLink = links.find((l) => l.child_id === selected);
 
   return (
@@ -296,13 +308,24 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
                     : "This child can open CyberEdu lessons and minigames. Turn it off to hide the tab from them."}
                 </p>
               </div>
-              <Button
-                variant={selectedLink.edu_disabled ? "default" : "outline"}
-                size="sm"
-                onClick={() => toggleEdu(selectedLink.child_id, !selectedLink.edu_disabled)}
-              >
-                {selectedLink.edu_disabled ? "Turn CyberEdu on" : "Turn CyberEdu off"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={selectedLink.edu_disabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleEdu(selectedLink.child_id, !selectedLink.edu_disabled)}
+                >
+                  {selectedLink.edu_disabled ? "Turn CyberEdu on" : "Turn CyberEdu off"}
+                </Button>
+                <Button
+                  variant={selectedLink.edu_games_disabled ? "default" : "outline"}
+                  size="sm"
+                  disabled={selectedLink.edu_disabled}
+                  onClick={() => toggleEduGames(selectedLink.child_id, !selectedLink.edu_games_disabled)}
+                  title={selectedLink.edu_disabled ? "CyberEdu is already fully off" : undefined}
+                >
+                  {selectedLink.edu_games_disabled ? "Turn CyberEdu games on" : "Turn CyberEdu games off"}
+                </Button>
+              </div>
             </div>
           )}
 
