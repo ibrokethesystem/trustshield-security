@@ -305,7 +305,9 @@ export function ChildMonitoring({ parentUserId }: { parentUserId: string | undef
                 <p className="text-xs text-muted-foreground">
                   {selectedLink.edu_disabled
                     ? "CyberEdu is hidden from this child's sidebar. Turn it back on to let them keep learning."
-                    : "This child can open CyberEdu lessons and minigames. Turn it off to hide the tab from them."}
+                    : selectedLink.edu_games_disabled
+                      ? "This child can open CyberEdu lessons, but the mini-games section is hidden."
+                      : "This child can open CyberEdu lessons and mini-games. Hide the whole tab, or just the games."}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
