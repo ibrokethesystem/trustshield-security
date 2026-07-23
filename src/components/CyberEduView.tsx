@@ -17,7 +17,7 @@ type Lesson = {
   quiz: Quiz;
   unlocksGame?: MiniGameKey;
 };
-type MiniGameKey = "phish-or-legit" | "password-power" | "link-detective";
+type MiniGameKey = "phish-or-legit" | "password-power" | "link-detective" | "space-shooter";
 
 const LESSONS: Lesson[] = [
   {
@@ -61,6 +61,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Free stuff messages are almost always scams. Grown-ups can help you check.",
     },
+    quizzes: [
+      {
+        q: "Which feeling do scammers try to trigger MOST often?",
+        choices: ["Boredom", "Panic or excitement", "Sleepiness"],
+        answer: 1,
+        why: "Panic and excitement make people click before thinking.",
+      },
+      {
+        q: "How long should you wait before clicking a surprising pop-up?",
+        choices: ["0 seconds", "About 10 seconds", "Never — just click"],
+        answer: 1,
+        why: "The 10-second rule gives your brain time to spot the trick.",
+      },
+      {
+        q: "A pop-up says 'Your device is INFECTED! Call this number NOW.' What is it?",
+        choices: ["A real warning", "A scam", "A software update"],
+        answer: 1,
+        why: "Real antivirus doesn't ask you to call a phone number.",
+      },
+    ],
   },
   {
     id: "l2",
@@ -104,6 +124,26 @@ const LESSONS: Lesson[] = [
       answer: 2,
       why: "Longer, mixed, and random-ish is much harder to guess.",
     },
+    quizzes: [
+      {
+        q: "What makes a password strongest?",
+        choices: ["Being short and easy", "Being long and unpredictable", "Using your pet's name"],
+        answer: 1,
+        why: "Length + randomness beats short 'clever' passwords every time.",
+      },
+      {
+        q: "What does 2-factor authentication add?",
+        choices: ["A second password to type", "A code from your phone", "A longer username"],
+        answer: 1,
+        why: "2FA needs something you HAVE (your phone) not just something you know.",
+      },
+      {
+        q: "Is it OK to use the same password on 5 sites?",
+        choices: ["Yes, easier to remember", "No — one leak breaks all 5", "Only if it's long"],
+        answer: 1,
+        why: "If one site is hacked, attackers try that password everywhere.",
+      },
+    ],
     unlocksGame: "password-power",
   },
   {
@@ -146,6 +186,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Real companies don't rush you like that. It's a classic phishing trick.",
     },
+    quizzes: [
+      {
+        q: "Which sender address is suspicious?",
+        choices: ["support@paypal.com", "support@paypa1-secure.co", "help@school.edu"],
+        answer: 1,
+        why: "The '1' instead of 'l' and weird domain give it away.",
+      },
+      {
+        q: "You clicked a phishing link by accident. First step?",
+        choices: ["Keep it a secret", "Tell a grown-up right away", "Turn off your device forever"],
+        answer: 1,
+        why: "Speaking up fast lets a grown-up help you change passwords.",
+      },
+      {
+        q: "Real companies asking for your password by email is…",
+        choices: ["Totally normal", "Almost never a real thing", "Only on Fridays"],
+        answer: 1,
+        why: "Legit companies don't email asking for your password.",
+      },
+    ],
     unlocksGame: "phish-or-legit",
   },
   {
@@ -187,6 +247,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Weird spelling and 'http' (no s) is a big warning sign.",
     },
+    quizzes: [
+      {
+        q: "In 'https://google.com.evil-site.win/login', which is the REAL site?",
+        choices: ["google.com", "evil-site.win", "login"],
+        answer: 1,
+        why: "Read from the right — the real site is what's just before the first '/'.",
+      },
+      {
+        q: "Which is the fake?",
+        choices: ["https://www.amazon.com", "https://arnazon.com", "https://amazon.co.uk"],
+        answer: 1,
+        why: "'arnazon' uses 'rn' to look like 'm' — classic lookalike trick.",
+      },
+      {
+        q: "What does the lock icon in the address bar mean?",
+        choices: ["The site is 100% safe", "The connection is encrypted", "The site is famous"],
+        answer: 1,
+        why: "The lock means encryption — NOT that the site is trustworthy.",
+      },
+    ],
     unlocksGame: "link-detective",
   },
   {
@@ -231,6 +311,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Real friends don't need private info. Always tell a grown-up.",
     },
+    quizzes: [
+      {
+        q: "Which of these is 'private' info?",
+        choices: ["Your favorite color", "Your home address", "Your Minecraft username"],
+        answer: 1,
+        why: "Address, school, phone, birthday — all private.",
+      },
+      {
+        q: "A quiz asks 20 personal questions for a 'prize'. It's probably…",
+        choices: ["A fun game", "A data-collection trap", "Homework"],
+        answer: 1,
+        why: "Long question quizzes often exist just to harvest info.",
+      },
+      {
+        q: "Someone online asks to meet you in person. What do you do?",
+        choices: ["Meet up quickly", "Tell a trusted grown-up immediately", "Send your address"],
+        answer: 1,
+        why: "ANY request to meet from an online stranger is a red flag.",
+      },
+    ],
   },
   {
     id: "l6",
@@ -272,6 +372,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Updates fix holes that hackers use. Installing them keeps you safer.",
     },
+    quizzes: [
+      {
+        q: "What color 'hat' is a helpful hacker?",
+        choices: ["Black hat", "White hat", "Red hat"],
+        answer: 1,
+        why: "White hats are the good guys who find and report bugs.",
+      },
+      {
+        q: "Which is the WORST for stopping hackers?",
+        choices: ["Long unique passwords", "Ignoring updates for a year", "Using 2-factor"],
+        answer: 1,
+        why: "Old software has known holes hackers already know how to walk through.",
+      },
+      {
+        q: "You leave your laptop at a library. Best move?",
+        choices: ["Just walk away", "Lock the screen first", "Log out of the internet"],
+        answer: 1,
+        why: "Locking stops anyone nearby from touching your accounts.",
+      },
+    ],
   },
   {
     id: "l7",
@@ -311,6 +431,26 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Watching or reading is fine. Save passwords and money stuff for home.",
     },
+    quizzes: [
+      {
+        q: "What's an 'evil twin' wifi network?",
+        choices: ["A backup network", "A fake wifi named like a real one", "A network with 2 routers"],
+        answer: 1,
+        why: "Attackers name their fake hotspot to look official.",
+      },
+      {
+        q: "What does a VPN mainly do?",
+        choices: ["Speeds up your device", "Encrypts your traffic in a tunnel", "Blocks all websites"],
+        answer: 1,
+        why: "A VPN wraps your data so people on the same network can't peek.",
+      },
+      {
+        q: "Best setting for public wifi?",
+        choices: ["Auto-connect to any open wifi", "Turn auto-connect OFF", "Share your hotspot to strangers"],
+        answer: 1,
+        why: "Auto-connect lets your device join fake networks without asking.",
+      },
+    ],
   },
   {
     id: "l8",
@@ -351,6 +491,27 @@ const LESSONS: Lesson[] = [
       answer: 1,
       why: "Grown-ups can help figure out what's real. You're a team!",
     },
+    quizzes: [
+      {
+        q: "What does 'S' stand for in the STOP method?",
+        choices: ["Shout", "Slow down", "Screenshot"],
+        answer: 1,
+        why: "Slowing down is the #1 tool against scams.",
+      },
+      {
+        q: "You get a weird message. Best evidence to save?",
+        choices: ["A screenshot", "Your feelings about it", "Nothing — just delete"],
+        answer: 0,
+        why: "Screenshots help grown-ups (and Cyber Guardian) figure out what happened.",
+      },
+      {
+        q: "Being extra cautious online is…",
+        choices: ["Embarrassing", "Smart — pros do it too", "A waste of time"],
+        answer: 1,
+        why: "Every real cybersecurity expert double-checks. So should you.",
+      },
+    ],
+    unlocksGame: "space-shooter",
   },
 ];
 
