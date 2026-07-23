@@ -1067,8 +1067,8 @@ function SpaceShooter({ onEarnXp, onClose }: GameProps) {
       const kind: "phish" | "virus" = Math.random() < 0.5 ? "phish" : "virus";
       const label = VIRUS_WORDS[Math.floor(Math.random() * VIRUS_WORDS.length)];
       const x = 30 + Math.random() * (W - 60);
-      const vy = 0.35 + Math.random() * 0.3 + stateRef.wave * 0.12;
-      const vx = (Math.random() < 0.5 ? -1 : 1) * (0.6 + Math.random() * 0.6);
+      const vy = 0.18 + Math.random() * 0.15 + stateRef.wave * 0.06;
+      const vx = (Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.35);
       const hp = kind === "virus" ? 2 : 1;
       const size = kind === "virus" ? 14 : 12;
       (stateRef.enemies as any).push({ x, y: -20, vx, vy, label, kind, hp, size, phase: Math.random() * Math.PI * 2 });
