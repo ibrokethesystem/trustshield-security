@@ -479,12 +479,21 @@ export default function PasswordsView({ userId, onAskGuardian }: { userId: strin
 
   const remove = async (id: string) => {
     if (userId) {
-      const { error } = await supabase.from("vault_entries").delete().eq("id", id).eq("user_id", userId);
-      if (error) { toast.error("Couldn't delete", { description: error.message }); return; }
+      // Route deletes through a service-role edge function so they persist
+      // regardless of vault-lock RLS state or transient session issues.
+      const { data, error } = await supabase.functions.invoke("vault-delete", {
+        body: { id },
+      });
+      const errMsg = (data as { error?: string } | null)?.error;
+      if (error || errMsg) {
+        toast.error("Couldn't delete", { description: error?.message || errMsg });
+        return;
+      }
     }
     const next = entries.filter((e) => e.id !== id);
     setEntries(next); updateSummary(next);
     if (!userId) { try { localStorage.setItem(localVaultKey(undefined), JSON.stringify(next)); } catch {} }
+    toast.success("Password deleted");
   };
 
   const copy = async (text: string) => {

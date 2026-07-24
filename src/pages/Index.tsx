@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.0.9",
+    version: "2.0.9",
+    name: "Password vault deletes now stick",
+    date: "2026-07-24",
+    summary:
+      "Fixed a bug where deleting a password from the vault would come back after reloading. Deletes now go through a secure server route so they're removed permanently across every device.",
+  },
+  {
     id: "2.0.8",
     version: "2.0.8",
     name: "Parents can turn CyberEdu games off separately",
