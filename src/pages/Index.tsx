@@ -2935,9 +2935,34 @@ function GuardianView({
     activeThreats.length > 0 ? "all" : "general",
   );
   const [selectedThreatId, setSelectedThreatId] = useState<string | "">("");
-  const [messages, setMessages] = useState<
-    { role: "user" | "assistant"; content: string; images?: string[] }[]
-  >([]);
+  type GuardianMsg = { role: "user" | "assistant"; content: string; images?: string[] };
+  type GuardianMode = "all" | "emergency" | "threat" | "general";
+  const CHAT_KEY = "ts_guardian_chats";
+  const [chats, setChats] = useState<Record<GuardianMode, GuardianMsg[]>>(() => {
+    const empty: Record<GuardianMode, GuardianMsg[]> = { all: [], emergency: [], threat: [], general: [] };
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(CHAT_KEY) : null;
+      if (!raw) return empty;
+      const parsed = JSON.parse(raw);
+      (["all", "emergency", "threat", "general"] as GuardianMode[]).forEach((k) => {
+        if (Array.isArray(parsed?.[k])) empty[k] = parsed[k];
+      });
+    } catch { /* ignore */ }
+    return empty;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(chats)); } catch { /* ignore */ }
+  }, [chats]);
+  const messages = chats[mode] ?? [];
+  const setMessages = useCallback(
+    (updater: GuardianMsg[] | ((cur: GuardianMsg[]) => GuardianMsg[])) => {
+      setChats((cur) => ({
+        ...cur,
+        [mode]: typeof updater === "function" ? (updater as (c: GuardianMsg[]) => GuardianMsg[])(cur[mode] ?? []) : updater,
+      }));
+    },
+    [mode],
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -3090,22 +3115,31 @@ function GuardianView({
               happening right now.
             </p>
           </div>
-          <button
-            onClick={() => setMessages([])}
-            disabled={sending || messages.length === 0}
-            className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
-          >
-            Clear chat
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMessages([])}
+              disabled={sending || messages.length === 0}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
+            >
+              Clear chat
+            </button>
+            <button
+              onClick={() => {
+                setChats({ all: [], emergency: [], threat: [], general: [] });
+                toast.success("All Cyber Guardian chats cleared");
+              }}
+              disabled={sending || Object.values(chats).every((c) => c.length === 0)}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
+            >
+              Clear all chats
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
           {modes.map((m) => (
             <button
               key={m.key}
-              onClick={() => {
-                setMode(m.key);
-                setMessages([]);
-              }}
+              onClick={() => setMode(m.key)}
               className={cn(
                 "text-left p-3 rounded-xl border transition",
                 mode === m.key
