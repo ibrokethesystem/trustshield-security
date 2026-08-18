@@ -3115,13 +3115,25 @@ function GuardianView({
               happening right now.
             </p>
           </div>
-          <button
-            onClick={() => setMessages([])}
-            disabled={sending || messages.length === 0}
-            className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
-          >
-            Clear chat
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMessages([])}
+              disabled={sending || messages.length === 0}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
+            >
+              Clear chat
+            </button>
+            <button
+              onClick={() => {
+                setChats({ all: [], emergency: [], threat: [], general: [] });
+                toast.success("All Cyber Guardian chats cleared");
+              }}
+              disabled={sending || Object.values(chats).every((c) => c.length === 0)}
+              className="text-xs px-2.5 py-1.5 rounded-md border border-border bg-secondary/50 hover:bg-secondary disabled:opacity-40"
+            >
+              Clear all chats
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
           {modes.map((m) => (
