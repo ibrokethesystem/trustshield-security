@@ -2935,9 +2935,34 @@ function GuardianView({
     activeThreats.length > 0 ? "all" : "general",
   );
   const [selectedThreatId, setSelectedThreatId] = useState<string | "">("");
-  const [messages, setMessages] = useState<
-    { role: "user" | "assistant"; content: string; images?: string[] }[]
-  >([]);
+  type GuardianMsg = { role: "user" | "assistant"; content: string; images?: string[] };
+  type GuardianMode = "all" | "emergency" | "threat" | "general";
+  const CHAT_KEY = "ts_guardian_chats";
+  const [chats, setChats] = useState<Record<GuardianMode, GuardianMsg[]>>(() => {
+    const empty: Record<GuardianMode, GuardianMsg[]> = { all: [], emergency: [], threat: [], general: [] };
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(CHAT_KEY) : null;
+      if (!raw) return empty;
+      const parsed = JSON.parse(raw);
+      (["all", "emergency", "threat", "general"] as GuardianMode[]).forEach((k) => {
+        if (Array.isArray(parsed?.[k])) empty[k] = parsed[k];
+      });
+    } catch { /* ignore */ }
+    return empty;
+  });
+  useEffect(() => {
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(chats)); } catch { /* ignore */ }
+  }, [chats]);
+  const messages = chats[mode] ?? [];
+  const setMessages = useCallback(
+    (updater: GuardianMsg[] | ((cur: GuardianMsg[]) => GuardianMsg[])) => {
+      setChats((cur) => ({
+        ...cur,
+        [mode]: typeof updater === "function" ? (updater as (c: GuardianMsg[]) => GuardianMsg[])(cur[mode] ?? []) : updater,
+      }));
+    },
+    [mode],
+  );
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -3102,10 +3127,7 @@ function GuardianView({
           {modes.map((m) => (
             <button
               key={m.key}
-              onClick={() => {
-                setMode(m.key);
-                setMessages([]);
-              }}
+              onClick={() => setMode(m.key)}
               className={cn(
                 "text-left p-3 rounded-xl border transition",
                 mode === m.key
