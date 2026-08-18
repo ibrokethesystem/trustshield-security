@@ -91,6 +91,14 @@ type UpdateNote = { id: string; version: string; name: string; date: string; sum
 
 const UPDATES: UpdateNote[] = [
   {
+    id: "2.1.0",
+    version: "2.1.0",
+    name: "Cyber Guardian remembers your chats",
+    date: "2026-08-18",
+    summary:
+      "Cyber Guardian now saves your conversation for each of the four tabs (All alerts, One alert, Emergency, Stay safe) separately — close the tab or reload and your chat is still there. Switching tabs no longer wipes anything. Added a second button next to \"Clear chat\" called \"Clear all chats\" that wipes every tab's conversation at once.",
+  },
+  {
     id: "2.0.9",
     version: "2.0.9",
     name: "Password vault deletes now stick",
